@@ -52,7 +52,7 @@ defmodule ObservLib.MixProject do
   defp docs do
     [
       main: "readme",
-      logo: "docs/assets/logo.png",
+      logo: "docs/assets/logo.svg",
       extras: extras(),
       groups_for_extras: groups_for_extras(),
       groups_for_modules: groups_for_modules(),
