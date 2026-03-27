@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Elixir Purple Gradient -->
+    <linearGradient id="elixirGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#A074C4;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6B46C1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4E2A84;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Highlight Gradient -->
+    <radialGradient id="highlightGradient" cx="35%" cy="30%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:0" />
+    </radialGradient>
+
+    <!-- Eye Gradient -->
+    <radialGradient id="eyeGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#E0D4F7;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#A074C4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6B46C1;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <!-- Elixir Droplet Shape (like the Elixir logo) -->
+  <path d="
+    M 128 40
+    C 128 40, 85 75, 85 120
+    C 85 155, 103 180, 128 180
+    C 153 180, 171 155, 171 120
+    C 171 75, 128 40, 128 40 Z
+  " fill="url(#elixirGradient)" stroke="#4E2A84" stroke-width="2"/>
+
+  <!-- Facets (gem-like appearance typical of Elixir) -->
+  <path d="M 128 40 L 105 85 L 128 110 Z" fill="#8B5CF6" opacity="0.3"/>
+  <path d="M 128 40 L 151 85 L 128 110 Z" fill="#A074C4" opacity="0.2"/>
+  <path d="M 85 120 L 105 95 L 128 110 Z" fill="#6B46C1" opacity="0.2"/>
+  <path d="M 171 120 L 151 95 L 128 110 Z" fill="#8B5CF6" opacity="0.2"/>
+
+  <!-- Observability Eye in the center of the drop -->
+  <g transform="translate(128, 125)">
+    <!-- Eye outline -->
+    <ellipse cx="0" cy="0" rx="35" ry="22" fill="url(#eyeGradient)" opacity="0.9"/>
+    <ellipse cx="0" cy="0" rx="35" ry="22" fill="none" stroke="#4E2A84" stroke-width="2"/>
+
+    <!-- Iris -->
+    <circle cx="0" cy="0" r="12" fill="#2D1B4E"/>
+
+    <!-- Pupil with highlight -->
+    <circle cx="0" cy="0" r="7" fill="#0F0519"/>
+    <circle cx="3" cy="-3" r="3" fill="white" opacity="0.95"/>
+  </g>
+
+  <!-- Telemetry Signal Waves (emanating from the drop) -->
+  <!-- Top Right -->
+  <path d="M 145 70 Q 165 60, 175 55" fill="none" stroke="#A074C4" stroke-width="2.5" opacity="0.6" stroke-linecap="round"/>
+  <path d="M 150 60 Q 175 48, 190 40" fill="none" stroke="#A074C4" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <path d="M 155 50 Q 185 35, 200 25" fill="none" stroke="#A074C4" stroke-width="1.5" opacity="0.25" stroke-linecap="round"/>
+
+  <!-- Top Left -->
+  <path d="M 111 70 Q 91 60, 81 55" fill="none" stroke="#A074C4" stroke-width="2.5" opacity="0.6" stroke-linecap="round"/>
+  <path d="M 106 60 Q 81 48, 66 40" fill="none" stroke="#A074C4" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <path d="M 101 50 Q 71 35, 56 25" fill="none" stroke="#A074C4" stroke-width="1.5" opacity="0.25" stroke-linecap="round"/>
+
+  <!-- Bottom Right -->
+  <path d="M 155 160 Q 175 170, 185 175" fill="none" stroke="#6B46C1" stroke-width="2.5" opacity="0.6" stroke-linecap="round"/>
+  <path d="M 160 170 Q 185 182, 200 190" fill="none" stroke="#6B46C1" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+
+  <!-- Bottom Left -->
+  <path d="M 101 160 Q 81 170, 71 175" fill="none" stroke="#6B46C1" stroke-width="2.5" opacity="0.6" stroke-linecap="round"/>
+  <path d="M 96 170 Q 71 182, 56 190" fill="none" stroke="#6B46C1" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+
+  <!-- Data/Metric Points (like telemetry data) -->
+  <circle cx="180" cy="50" r="3" fill="#A074C4" opacity="0.8"/>
+  <circle cx="195" cy="38" r="2.5" fill="#A074C4" opacity="0.6"/>
+  <circle cx="205" cy="28" r="2" fill="#A074C4" opacity="0.4"/>
+
+  <circle cx="76" cy="50" r="3" fill="#A074C4" opacity="0.8"/>
+  <circle cx="61" cy="38" r="2.5" fill="#A074C4" opacity="0.6"/>
+  <circle cx="51" cy="28" r="2" fill="#A074C4" opacity="0.4"/>
+
+  <circle cx="190" cy="175" r="3" fill="#6B46C1" opacity="0.8"/>
+  <circle cx="205" cy="188" r="2.5" fill="#6B46C1" opacity="0.6"/>
+
+  <circle cx="66" cy="175" r="3" fill="#6B46C1" opacity="0.8"/>
+  <circle cx="51" cy="188" r="2.5" fill="#6B46C1" opacity="0.6"/>
+
+  <!-- Highlight on droplet (characteristic of Elixir logo) -->
+  <ellipse cx="105" cy="75" rx="25" ry="35" fill="url(#highlightGradient)" opacity="0.4"/>
+
+  <!-- Subtle trace line across the eye -->
+  <line x1="90" y1="125" x2="166" y2="125" stroke="#E0D4F7" stroke-width="1" opacity="0.3" stroke-dasharray="4,3"/>
+</svg>
