@@ -1,0 +1,48 @@
+[book]
+title = "ObservLib Usage Guide"
+description = "Comprehensive guide for using ObservLib - OpenTelemetry observability for Elixir"
+authors = ["ObservLib Contributors"]
+language = "en"
+multilingual = false
+src = "docs/book"
+
+[build]
+build-dir = "doc/book"
+create-missing = false
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/yourorg/observlib"
+edit-url-template = "https://github.com/yourorg/observlib/edit/master/docs/book/{path}"
+site-url = "/book/"
+cname = "observlib.dev"
+
+[output.html.fold]
+enable = true
+level = 0
+
+[output.html.playground]
+editable = false
+copyable = true
+copy-js = true
+
+[output.html.search]
+enable = true
+limit-results = 30
+teaser-word-count = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.redirect]
+"/index.html" = "introduction.html"
+
+[preprocessor.links]
+
+[output.linkcheck]
+follow-web-links = false
+exclude = [ "https://hexdocs.pm/observlib/*" ]

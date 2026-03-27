@@ -1,0 +1,1 @@
+# ObservLib Logo Placeholder
