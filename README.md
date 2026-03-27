@@ -1,9 +1,30 @@
-# ObservLib
+<div align="center">
+  <img src="docs/assets/logo.svg" alt="ObservLib" width="200" height="200">
 
-[![Hex.pm](https://img.shields.io/hexpm/v/observlib.svg)](https://hex.pm/packages/observlib)
-[![Documentation](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/observlib)
+  <h1>ObservLib</h1>
 
-OpenTelemetry observability library for Elixir. Unified interface for distributed tracing, metrics collection, and structured logging.
+  <p>
+    <strong>OpenTelemetry observability library for Elixir</strong>
+  </p>
+
+  <p>
+    Unified interface for distributed tracing, metrics collection, and structured logging
+  </p>
+
+  <p>
+    <a href="https://hex.pm/packages/observlib">
+      <img src="https://img.shields.io/hexpm/v/observlib.svg" alt="Hex.pm">
+    </a>
+    <a href="https://hexdocs.pm/observlib">
+      <img src="https://img.shields.io/badge/docs-hexdocs-blue.svg" alt="Documentation">
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/license-MIT-purple.svg" alt="License">
+    </a>
+  </p>
+</div>
+
+---
 
 ## Features
 
