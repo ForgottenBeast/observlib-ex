@@ -96,14 +96,16 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         max_retries: max_retries,
         retry_delay: retry_delay,
         timer_ref: nil,
+        # Note: metrics are now read from MeterProvider, not stored here
+        # We keep this for backward compatibility with tests that send direct messages
         metrics: %{},
         export_count: 0,
         error_count: 0,
         last_export_time: nil
       }
 
-      # Attach telemetry handler to collect metrics
-      :ok = attach_telemetry_handler()
+      # Note: Telemetry handler removed - metrics now flow directly to MeterProvider
+      # via ObservLib.Metrics API calls
 
       # Schedule first export
       timer_ref = Process.send_after(self(), :export, export_interval)
@@ -128,12 +130,21 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
 
   @impl true
   def handle_call(:get_stats, _from, state) do
+    # Get metric count from MeterProvider if available, fall back to internal state
+    metric_count = try do
+      length(ObservLib.Metrics.MeterProvider.read_all())
+    rescue
+      _ -> map_size(Map.get(state, :metrics, %{}))
+    catch
+      :exit, _ -> map_size(Map.get(state, :metrics, %{}))
+    end
+
     stats = %{
       enabled: state.enabled,
       export_count: Map.get(state, :export_count, 0),
       error_count: Map.get(state, :error_count, 0),
       last_export_time: Map.get(state, :last_export_time),
-      metric_count: map_size(Map.get(state, :metrics, %{}))
+      metric_count: metric_count
     }
 
     {:reply, stats, state}
@@ -178,45 +189,53 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
       Process.cancel_timer(state.timer_ref)
     end
 
-    # Detach telemetry handler
-    :telemetry.detach(:observlib_otlp_metrics_handler)
-
     :ok
   end
 
   # Private Functions
 
-  defp attach_telemetry_handler do
-    handler_id = :observlib_otlp_metrics_handler
-
-    handler_fun = fn event_name, measurements, metadata, _config ->
-      # Send to GenServer for aggregation
-      send(__MODULE__, {:telemetry_metric, event_name, measurements, metadata})
+  defp do_export(%{endpoint: endpoint} = state) do
+    # Read metrics from MeterProvider (primary source)
+    metrics_from_provider = try do
+      ObservLib.Metrics.MeterProvider.read_all()
+    rescue
+      _ -> []
+    catch
+      :exit, _ -> []
     end
 
-    # Attach to all telemetry events (we filter by metric_type in metadata)
-    case :telemetry.attach_many(handler_id, [[:observlib, :metrics]], handler_fun, nil) do
-      :ok ->
-        :ok
+    # Also check internal metrics for backward compatibility with tests
+    internal_metrics = Map.get(state, :metrics, %{})
 
-      {:error, :already_exists} ->
-        # Handler already exists, detach and reattach
-        :telemetry.detach(handler_id)
-        :telemetry.attach_many(handler_id, [[:observlib, :metrics]], handler_fun, nil)
+    if Enum.empty?(metrics_from_provider) and map_size(internal_metrics) == 0 do
+      Logger.debug("No metrics to export")
+      :ok
+    else
+      # Convert metrics from MeterProvider to OTLP format
+      otlp_metrics_from_provider = build_otlp_metrics_from_provider(metrics_from_provider)
+
+      # Convert internal metrics (for backward compat with tests)
+      otlp_metrics_internal = build_otlp_metrics(internal_metrics)
+
+      # Combine both sources
+      otlp_metrics = otlp_metrics_from_provider ++ otlp_metrics_internal
+
+      # Export with retry logic
+      result = export_with_retry(endpoint, otlp_metrics, state.max_retries, state.retry_delay)
+
+      # Reset MeterProvider metrics after successful export
+      if result == :ok do
+        try do
+          ObservLib.Metrics.MeterProvider.reset()
+        rescue
+          _ -> :ok
+        catch
+          :exit, _ -> :ok
+        end
+      end
+
+      result
     end
-  end
-
-  defp do_export(%{metrics: metrics, endpoint: endpoint} = state) when map_size(metrics) == 0 do
-    Logger.debug("No metrics to export")
-    :ok
-  end
-
-  defp do_export(%{metrics: metrics, endpoint: endpoint} = state) do
-    # Convert aggregated metrics to OTLP format
-    otlp_metrics = build_otlp_metrics(metrics)
-
-    # Export with retry logic
-    export_with_retry(endpoint, otlp_metrics, state.max_retries, state.retry_delay)
   end
 
   defp export_with_retry(_endpoint, _metrics, 0, _delay) do
@@ -345,6 +364,96 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     Enum.map(metrics, fn {{metric_name, _attributes}, metric_data} ->
       build_otlp_metric(metric_name, metric_data)
     end)
+  end
+
+  # Convert metrics from MeterProvider format to OTLP format
+  defp build_otlp_metrics_from_provider([]), do: []
+
+  defp build_otlp_metrics_from_provider(metrics) do
+    # Group by metric name
+    metrics
+    |> Enum.group_by(& &1.name)
+    |> Enum.map(fn {name, data_points} ->
+      build_otlp_metric_from_provider(name, data_points)
+    end)
+  end
+
+  defp build_otlp_metric_from_provider(name, data_points) do
+    # Get type from first data point
+    type = List.first(data_points).type
+
+    case type do
+      :counter ->
+        %{
+          "name" => name,
+          "sum" => %{
+            "dataPoints" => Enum.map(data_points, fn dp ->
+              %{
+                "asInt" => trunc(dp.data.value),
+                "timeUnixNano" => to_string(dp.data.timestamp),
+                "attributes" => map_to_attributes(dp.attributes)
+              }
+            end),
+            "aggregationTemporality" => 2,
+            "isMonotonic" => true
+          }
+        }
+
+      :gauge ->
+        %{
+          "name" => name,
+          "gauge" => %{
+            "dataPoints" => Enum.map(data_points, fn dp ->
+              %{
+                "asDouble" => dp.data.value,
+                "timeUnixNano" => to_string(dp.data.timestamp),
+                "attributes" => map_to_attributes(dp.attributes)
+              }
+            end)
+          }
+        }
+
+      :histogram ->
+        %{
+          "name" => name,
+          "histogram" => %{
+            "dataPoints" => Enum.map(data_points, fn dp ->
+              buckets = dp.data.buckets || []
+              bounds = Enum.map(buckets, fn {b, _} -> b end) |> Enum.reject(&(&1 == :infinity))
+              counts = Enum.map(buckets, fn {_, c} -> to_string(c) end)
+
+              %{
+                "count" => to_string(dp.data.count),
+                "sum" => dp.data.sum,
+                "timeUnixNano" => to_string(dp.data.timestamp),
+                "attributes" => map_to_attributes(dp.attributes),
+                "bucketCounts" => counts,
+                "explicitBounds" => bounds
+              }
+            end),
+            "aggregationTemporality" => 2
+          }
+        }
+
+      :up_down_counter ->
+        %{
+          "name" => name,
+          "sum" => %{
+            "dataPoints" => Enum.map(data_points, fn dp ->
+              %{
+                "asInt" => trunc(dp.data.value),
+                "timeUnixNano" => to_string(dp.data.timestamp),
+                "attributes" => map_to_attributes(dp.attributes)
+              }
+            end),
+            "aggregationTemporality" => 2,
+            "isMonotonic" => false
+          }
+        }
+
+      _ ->
+        %{"name" => name, "gauge" => %{"dataPoints" => []}}
+    end
   end
 
   defp build_otlp_metric(metric_name, %{type: type, data_points: data_points}) do

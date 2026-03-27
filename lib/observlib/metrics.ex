@@ -48,10 +48,15 @@ defmodule ObservLib.Metrics do
   """
   @spec counter(metric_name(), metric_value(), attributes()) :: :ok
   def counter(name, value, attributes \\ %{}) when is_number(value) and value >= 0 do
+    normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{count: value}
     metadata = Map.merge(attributes, %{metric_type: :counter})
 
+    # Record to MeterProvider ETS (primary storage)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :counter, value, attributes)
+
+    # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
     :ok
   end
@@ -76,10 +81,15 @@ defmodule ObservLib.Metrics do
   """
   @spec gauge(metric_name(), metric_value(), attributes()) :: :ok
   def gauge(name, value, attributes \\ %{}) when is_number(value) do
+    normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
     metadata = Map.merge(attributes, %{metric_type: :gauge})
 
+    # Record to MeterProvider ETS (primary storage)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :gauge, value, attributes)
+
+    # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
     :ok
   end
@@ -104,10 +114,15 @@ defmodule ObservLib.Metrics do
   """
   @spec histogram(metric_name(), metric_value(), attributes()) :: :ok
   def histogram(name, value, attributes \\ %{}) when is_number(value) do
+    normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
     metadata = Map.merge(attributes, %{metric_type: :histogram})
 
+    # Record to MeterProvider ETS (primary storage)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :histogram, value, attributes)
+
+    # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
     :ok
   end
@@ -132,10 +147,15 @@ defmodule ObservLib.Metrics do
   """
   @spec up_down_counter(metric_name(), metric_value(), attributes()) :: :ok
   def up_down_counter(name, value, attributes \\ %{}) when is_number(value) do
+    normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
     metadata = Map.merge(attributes, %{metric_type: :up_down_counter})
 
+    # Record to MeterProvider ETS (primary storage)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :up_down_counter, value, attributes)
+
+    # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
     :ok
   end
@@ -144,8 +164,8 @@ defmodule ObservLib.Metrics do
   Register a counter metric.
 
   Registration is optional but recommended for documenting available metrics
-  and their configuration. Registered metrics are tracked in the process dictionary
-  for the current process.
+  and their configuration. Registered metrics are stored in ETS via MeterProvider
+  for cross-process access.
 
   ## Parameters
 
@@ -223,6 +243,7 @@ defmodule ObservLib.Metrics do
   Get all registered metrics.
 
   Returns a list of registered metrics with their type and options.
+  Reads from ETS via MeterProvider for cross-process access.
 
   ## Example
 
@@ -235,9 +256,29 @@ defmodule ObservLib.Metrics do
   """
   @spec list_registered_metrics() :: [map()]
   def list_registered_metrics do
-    case Process.get(:observlib_metrics_registry) do
-      nil -> []
-      registry when is_list(registry) -> registry
+    # Try to read from MeterProvider ETS first
+    try do
+      ObservLib.Metrics.MeterProvider.list_registered()
+      |> Enum.map(fn definition ->
+        %{
+          name: definition.name,
+          type: definition.type,
+          opts: build_opts(definition)
+        }
+      end)
+    rescue
+      # Fall back to process dictionary if MeterProvider is not running
+      ArgumentError ->
+        case Process.get(:observlib_metrics_registry) do
+          nil -> []
+          registry when is_list(registry) -> registry
+        end
+    catch
+      :exit, _ ->
+        case Process.get(:observlib_metrics_registry) do
+          nil -> []
+          registry when is_list(registry) -> registry
+        end
     end
   end
 
@@ -245,13 +286,34 @@ defmodule ObservLib.Metrics do
 
   defp register_metric(name, type, opts) do
     normalized_name = normalize_name(name)
-    metric = %{name: normalized_name, type: type, opts: opts}
 
+    # Register with MeterProvider ETS (primary storage)
+    try do
+      ObservLib.Metrics.MeterProvider.register(normalized_name, type, opts)
+    rescue
+      # Fall back to process dictionary if MeterProvider is not running
+      ArgumentError ->
+        register_metric_fallback(normalized_name, type, opts)
+    catch
+      :exit, _ ->
+        register_metric_fallback(normalized_name, type, opts)
+    end
+
+    :ok
+  end
+
+  defp register_metric_fallback(normalized_name, type, opts) do
+    metric = %{name: normalized_name, type: type, opts: opts}
     registry = Process.get(:observlib_metrics_registry, [])
     updated_registry = [metric | Enum.reject(registry, &(&1.name == normalized_name))]
     Process.put(:observlib_metrics_registry, updated_registry)
+  end
 
-    :ok
+  defp build_opts(definition) do
+    opts = []
+    opts = if definition.unit, do: [{:unit, definition.unit} | opts], else: opts
+    opts = if definition.description, do: [{:description, definition.description} | opts], else: opts
+    opts
   end
 
   defp normalize_event_name(name) do
