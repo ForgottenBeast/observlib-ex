@@ -17,7 +17,10 @@ config :observlib,
   pyroscope_endpoint: nil,
   pyroscope_sample_rate: 5,
   log_level: :info,
-  resource_attributes: %{}
+  resource_attributes: %{},
+  # Telemetry event prefixes to automatically attach handlers for
+  # Example: [[:phoenix, :endpoint], [:ecto, :repo]]
+  telemetry_events: []
 
 # Import environment-specific config
 import_config "#{config_env()}.exs"

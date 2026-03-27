@@ -9,19 +9,24 @@ defmodule ObservLib.Application do
   use Application
   require Logger
 
-  alias ObservLib.Exporters.{OtlpTraceExporter, OtlpMetricsExporter, OtlpLogsExporter}
+  alias ObservLib.Exporters.OtlpTraceExporter
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Configuration GenServer
-      {ObservLib.Config, []}
-      # Additional components will be added in later phases:
-      # {ObservLib.Traces.Supervisor, []},
-      # {ObservLib.Metrics.Supervisor, []},
-      # {ObservLib.Logs.Supervisor, []},
-      # {ObservLib.Pyroscope.Client, []}
+    # Base children that always start
+    base_children = [
+      # Configuration GenServer (must start first)
+      {ObservLib.Config, []},
+      # Traces subsystem supervisor
+      {ObservLib.Traces.Supervisor, []},
+      # Metrics subsystem supervisor (includes MeterProvider, PrometheusReader, OtlpMetricsExporter)
+      {ObservLib.Metrics.Supervisor, []},
+      # Logs subsystem supervisor (includes OtlpLogsExporter and Logs.Backend)
+      {ObservLib.Logs.Supervisor, []}
     ]
+
+    # Conditionally add Pyroscope client if endpoint is configured
+    children = maybe_add_pyroscope_client(base_children)
 
     opts = [strategy: :one_for_one, name: ObservLib.Supervisor]
 
@@ -29,6 +34,18 @@ defmodule ObservLib.Application do
       # Setup OTLP exporters after Config is started
       setup_exporters()
       {:ok, pid}
+    end
+  end
+
+  defp maybe_add_pyroscope_client(children) do
+    # Check if pyroscope_endpoint is configured in Application env
+    # (Config GenServer hasn't started yet, so we read directly)
+    case Application.get_env(:observlib, :pyroscope_endpoint) do
+      nil ->
+        children
+
+      _endpoint ->
+        children ++ [{ObservLib.Pyroscope.Client, []}]
     end
   end
 
@@ -49,37 +66,19 @@ defmodule ObservLib.Application do
             Logger.warning("OTLP trace exporter setup failed: #{inspect(reason)}")
         end
 
-        # Start metrics exporter GenServer
-        case start_metrics_exporter() do
-          {:ok, _pid} ->
-            Logger.debug("OTLP metrics exporter started")
+        # Note: Metrics exporter is now started by Metrics.Supervisor
+        # Note: Logs exporter is now started by Logs.Supervisor
+
+        # Setup telemetry handlers
+        case ObservLib.Telemetry.setup() do
+          :ok ->
+            Logger.debug("Telemetry handlers setup successful")
 
           {:error, reason} ->
-            Logger.warning("OTLP metrics exporter failed to start: #{inspect(reason)}")
-        end
-
-        # Start logs exporter GenServer
-        case start_logs_exporter() do
-          {:ok, _pid} ->
-            Logger.debug("OTLP logs exporter started")
-
-          {:error, reason} ->
-            Logger.warning("OTLP logs exporter failed to start: #{inspect(reason)}")
+            Logger.warning("Telemetry handlers setup failed: #{inspect(reason)}")
         end
 
         :ok
     end
-  end
-
-  defp start_metrics_exporter do
-    # Start as a standalone process (not in supervision tree for now)
-    # In Phase 5, these will be properly supervised
-    OtlpMetricsExporter.start_link()
-  end
-
-  defp start_logs_exporter do
-    # Start as a standalone process (not in supervision tree for now)
-    # In Phase 5, these will be properly supervised
-    OtlpLogsExporter.start_link()
   end
 end
