@@ -21,6 +21,9 @@
     <a href="LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-purple.svg" alt="License">
     </a>
+    <a href="SECURITY.md">
+      <img src="https://img.shields.io/badge/security-hardened-green.svg" alt="Security">
+    </a>
   </p>
 </div>
 
@@ -196,6 +199,39 @@ ObservLib.Telemetry.setup()
 ObservLib.Telemetry.attach([:my_app, :worker])
 ObservLib.Telemetry.detach([:my_app, :worker])
 ```
+
+## Security
+
+ObservLib is built with security as a priority. Key security features include:
+
+- **TLS by Default**: Certificate verification enabled for all HTTPS connections
+- **Resource Protection**: Configurable limits prevent memory and CPU exhaustion
+- **Data Redaction**: Automatic redaction of sensitive attributes (passwords, tokens, keys)
+- **Rate Limiting**: Token bucket algorithm protects Prometheus endpoint
+- **Injection Prevention**: Comprehensive escaping for logs and metrics
+- **Access Control**: ETS tables use protected mode with proper ownership
+
+### Security Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| TLS 1.2+ | ✅ Enabled | Certificate verification with system CA store |
+| Attribute Redaction | ✅ Enabled | 18+ sensitive patterns redacted by default |
+| Resource Limits | ✅ Enabled | Cardinality, attribute count/size limits |
+| Rate Limiting | ✅ Enabled | 100 req/min default for Prometheus |
+| SSRF Prevention | ✅ Enabled | URL validation blocks dangerous schemes |
+| Basic Auth | ✅ Optional | Prometheus endpoint authentication |
+
+### Reporting Vulnerabilities
+
+Please see [SECURITY.md](SECURITY.md) for information on reporting security vulnerabilities.
+
+### Security Documentation
+
+- [Security Overview](docs/book/security/overview.md) - Architecture and features
+- [Security Configuration](docs/book/security/configuration.md) - Configuration examples
+- [Security Best Practices](docs/book/security/best-practices.md) - Production deployment
+- [Threat Model](docs/book/security/threat-model.md) - Attack vectors and mitigations
 
 ## Contributing
 

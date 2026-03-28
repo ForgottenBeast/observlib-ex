@@ -35,6 +35,13 @@
 - [OTLP Exporters](integrations/otlp-exporters.md)
 - [Prometheus](integrations/prometheus.md)
 
+# Security
+
+- [Security Overview](security/overview.md)
+- [Security Configuration](security/configuration.md)
+- [Security Best Practices](security/best-practices.md)
+- [Threat Model](security/threat-model.md)
+
 # Deployment
 
 - [Production Configuration](deployment/production-config.md)
