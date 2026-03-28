@@ -29,6 +29,53 @@ defmodule ObservLib.HTTP do
   require Logger
 
   @doc """
+  Validates an endpoint URL for security.
+
+  Returns {:ok, url} or {:error, reason}.
+
+  Rejects:
+  - Non-HTTP schemes (file://, ftp://, data://, etc.)
+  - URLs with user info (credentials in URL)
+  - Empty or malformed URLs
+
+  ## Examples
+
+      iex> ObservLib.HTTP.validate_endpoint_url("https://api.example.com/v1/traces")
+      {:ok, "https://api.example.com/v1/traces"}
+
+      iex> ObservLib.HTTP.validate_endpoint_url("file:///etc/passwd")
+      {:error, "Invalid scheme: only http and https allowed"}
+
+      iex> ObservLib.HTTP.validate_endpoint_url("http://user:pass@host")
+      {:error, "User info in URL not allowed (use headers for auth)"}
+
+      iex> ObservLib.HTTP.validate_endpoint_url(nil)
+      {:ok, nil}
+
+  """
+  @spec validate_endpoint_url(nil | String.t()) :: {:ok, nil | String.t()} | {:error, String.t()}
+  def validate_endpoint_url(nil), do: {:ok, nil}
+  def validate_endpoint_url(""), do: {:ok, nil}
+
+  def validate_endpoint_url(url) when is_binary(url) do
+    uri = URI.parse(url)
+
+    cond do
+      uri.scheme not in ["http", "https"] ->
+        {:error, "Invalid scheme: only http and https allowed"}
+
+      uri.userinfo != nil ->
+        {:error, "User info in URL not allowed (use headers for auth)"}
+
+      uri.host == nil or uri.host == "" ->
+        {:error, "Missing or empty host"}
+
+      true ->
+        {:ok, url}
+    end
+  end
+
+  @doc """
   Redacts sensitive headers from error context before logging.
 
   Removes Authorization, X-API-Key, X-Auth-Token, and similar headers
