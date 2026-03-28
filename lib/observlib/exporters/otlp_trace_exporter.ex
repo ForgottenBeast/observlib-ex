@@ -61,7 +61,8 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
         apply_configuration(config)
 
       {:error, reason} ->
-        Logger.warning("OTLP trace exporter not configured: #{inspect(reason)}")
+        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
+        Logger.warning("OTLP trace exporter not configured: #{inspect(safe_reason)}")
         {:error, reason}
     end
   end
@@ -136,7 +137,8 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
       :ok
     catch
       kind, reason ->
-        Logger.error("Failed to force flush spans: #{inspect({kind, reason})}")
+        safe_reason = ObservLib.HTTP.redact_sensitive_headers({kind, reason})
+        Logger.error("Failed to force flush spans: #{inspect(safe_reason)}")
         {:error, {kind, reason}}
     end
   end
@@ -154,7 +156,8 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
     :ok
   rescue
     e ->
-      Logger.error("Error configuring OTLP trace exporter: #{inspect(e)}")
+      safe_error = ObservLib.HTTP.redact_sensitive_headers(e)
+      Logger.error("Error configuring OTLP trace exporter: #{inspect(safe_error)}")
       {:error, e}
   end
 

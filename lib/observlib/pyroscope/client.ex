@@ -305,7 +305,8 @@ defmodule ObservLib.Pyroscope.Client do
         {:ok, new_state}
 
       {:error, reason} ->
-        Logger.warning("Pyroscope upload failed: #{inspect(reason)}")
+        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
+        Logger.warning("Pyroscope upload failed: #{inspect(safe_reason)}")
         new_state = %{state | error_count: state.error_count + 1}
         {:error, reason, new_state}
     end
@@ -420,7 +421,7 @@ defmodule ObservLib.Pyroscope.Client do
     ]
 
     try do
-      case Req.post(url, headers: headers, body: profile_data) do
+      case ObservLib.HTTP.post(url, profile_data, headers) do
         {:ok, %{status: status}} when status in 200..299 ->
           :ok
 

@@ -101,7 +101,8 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         metrics: %{},
         export_count: 0,
         error_count: 0,
-        last_export_time: nil
+        last_export_time: nil,
+        retry_count: 0
       }
 
       # Note: Telemetry handler removed - metrics now flow directly to MeterProvider
@@ -159,11 +160,46 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
   def handle_info(:export, state) do
     # Perform export
     result = do_export(state)
-    new_state = update_export_stats(state, result)
+
+    new_state = case result do
+      :ok ->
+        update_export_stats(state, :ok)
+
+      {:retry, new_retry_count} ->
+        # Schedule retry with exponential backoff
+        retry_delay = calculate_retry_delay(new_retry_count)
+        Process.send_after(self(), :retry_export, retry_delay)
+        %{state | retry_count: new_retry_count}
+
+      {:error, _reason} = error ->
+        update_export_stats(state, error)
+    end
 
     # Schedule next export
     timer_ref = Process.send_after(self(), :export, state.export_interval)
     new_state = %{new_state | timer_ref: timer_ref}
+
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_info(:retry_export, state) do
+    # Retry export
+    result = do_export(state)
+
+    new_state = case result do
+      :ok ->
+        update_export_stats(%{state | retry_count: 0}, :ok)
+
+      {:retry, new_retry_count} ->
+        # Schedule another retry with exponential backoff
+        retry_delay = calculate_retry_delay(new_retry_count)
+        Process.send_after(self(), :retry_export, retry_delay)
+        %{state | retry_count: new_retry_count}
+
+      {:error, _reason} = error ->
+        update_export_stats(%{state | retry_count: 0}, error)
+    end
 
     {:noreply, new_state}
   end
@@ -238,21 +274,17 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     end
   end
 
-  defp export_with_retry(_endpoint, _metrics, 0, _delay) do
-    {:error, :max_retries_exceeded}
-  end
-
-  defp export_with_retry(endpoint, metrics, retries_left, delay) do
+  defp export_with_retry(endpoint, metrics, retries_left, _delay) do
     case do_http_export(endpoint, metrics) do
       :ok ->
         :ok
 
       {:error, reason} ->
-        Logger.warning("Metrics export failed: #{inspect(reason)}, retries left: #{retries_left - 1}")
+        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
+        Logger.warning("Metrics export failed: #{inspect(safe_reason)}, retries left: #{retries_left - 1}")
 
         if retries_left > 1 do
-          Process.sleep(delay)
-          export_with_retry(endpoint, metrics, retries_left - 1, delay * 2)
+          {:retry, retries_left - 1}
         else
           {:error, reason}
         end
@@ -286,18 +318,21 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
       ]
     }
 
-    # Send HTTP POST request
-    case Req.post(url, json: body, headers: [{"content-type", "application/json"}]) do
+    # Send HTTP POST request with TLS validation
+    headers = [{"content-type", "application/json"}]
+    case ObservLib.HTTP.post(url, body, headers) do
       {:ok, %Req.Response{status: status}} when status in 200..299 ->
         Logger.debug("Metrics exported successfully")
         :ok
 
       {:ok, %Req.Response{status: status, body: body}} ->
-        Logger.error("Metrics export failed with status #{status}: #{inspect(body)}")
+        safe_body = ObservLib.HTTP.redact_sensitive_headers(body)
+        Logger.error("Metrics export failed with status #{status}: #{inspect(safe_body)}")
         {:error, {:http_error, status}}
 
       {:error, reason} ->
-        Logger.error("Metrics export request failed: #{inspect(reason)}")
+        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
+        Logger.error("Metrics export request failed: #{inspect(safe_reason)}")
         {:error, reason}
     end
   end
@@ -608,7 +643,8 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
       state
       | export_count: state.export_count + 1,
         last_export_time: DateTime.utc_now(),
-        metrics: %{}
+        metrics: %{},
+        retry_count: 0
     }
   end
 
@@ -616,7 +652,15 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     %{
       state
       | error_count: state.error_count + 1,
-        last_export_time: DateTime.utc_now()
+        last_export_time: DateTime.utc_now(),
+        retry_count: 0
     }
+  end
+
+  defp calculate_retry_delay(retry_count) do
+    # Exponential backoff with jitter: 1s, 2s, 4s, 8s, max 30s
+    base = min(:math.pow(2, retry_count) * 1000, 30_000)
+    jitter = :rand.uniform(1000)
+    trunc(base + jitter)
   end
 end
