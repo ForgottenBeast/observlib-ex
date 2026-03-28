@@ -248,8 +248,14 @@ defmodule ObservLib.Telemetry do
   # Private helpers
 
   @spec handler_id(event_prefix()) :: handler_id()
-  defp handler_id(prefix) do
+  defp handler_id(prefix) when is_list(prefix) do
+    # Validate all elements are atoms to prevent injection
+    unless Enum.all?(prefix, &is_atom/1) do
+      raise ArgumentError, "handler_id/1 requires a list of atoms, got: #{inspect(prefix)}"
+    end
+
     suffix = prefix |> Enum.map(&Atom.to_string/1) |> Enum.join("_")
+    # Safe: prefix is validated to be atoms from code, not user input
     String.to_atom("observlib_" <> suffix)
   end
 
