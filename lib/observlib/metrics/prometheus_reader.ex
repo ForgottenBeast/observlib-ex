@@ -8,7 +8,23 @@ defmodule ObservLib.Metrics.PrometheusReader do
   ## Configuration
 
       config :observlib,
-        prometheus_port: 9568
+        prometheus_port: 9568,
+        prometheus_max_connections: 10,
+        prometheus_rate_limit: 100,
+        prometheus_basic_auth: {"username", "password"}
+
+  ## Security Features
+
+  ### sec-008: Connection, Rate Limiting, and Authentication
+  - **Connection Limiting**: Limits concurrent connections to prevent resource exhaustion
+  - **Rate Limiting**: Token bucket algorithm limits requests per minute
+  - **Basic Authentication**: Optional HTTP Basic Auth for access control
+
+  ### sec-014: Enhanced Prometheus Label Injection Prevention
+  - **Control Character Escaping**: Escapes all ASCII control characters (0-31, 127) in label values
+  - **CRLF Injection Prevention**: Escapes carriage return and newline characters
+  - **Null Byte Handling**: Converts null bytes to \x00 escape sequences
+  - **Comprehensive Escaping**: Handles backslash, quotes, tabs, and all other control chars
 
   ## Prometheus Format
 
@@ -23,8 +39,11 @@ defmodule ObservLib.Metrics.PrometheusReader do
       # Start the reader (typically via Metrics.Supervisor)
       {:ok, pid} = ObservLib.Metrics.PrometheusReader.start_link()
 
-      # Scrape metrics
+      # Scrape metrics (without auth)
       curl http://localhost:9568/metrics
+
+      # Scrape metrics (with auth)
+      curl -u username:password http://localhost:9568/metrics
   """
 
   use GenServer
@@ -69,6 +88,10 @@ defmodule ObservLib.Metrics.PrometheusReader do
     port = Keyword.get(opts, :port) ||
            Application.get_env(:observlib, :prometheus_port, @default_port)
 
+    max_connections = Application.get_env(:observlib, :prometheus_max_connections, 10)
+    rate_limit = Application.get_env(:observlib, :prometheus_rate_limit, 100)
+    basic_auth = Application.get_env(:observlib, :prometheus_basic_auth, nil)
+
     # Start TCP listener
     case :gen_tcp.listen(port, [
       :binary,
@@ -86,10 +109,14 @@ defmodule ObservLib.Metrics.PrometheusReader do
           acceptor_pid: acceptor_pid,
           scrape_count: 0,
           error_count: 0,
-          last_scrape_time: nil
+          last_scrape_time: nil,
+          active_connections: 0,
+          max_connections: max_connections,
+          rate_limiter: init_rate_limiter(rate_limit),
+          basic_auth: basic_auth
         }
 
-        Logger.info("PrometheusReader started on port #{port}")
+        Logger.info("PrometheusReader started on port #{port} (max_connections: #{max_connections}, rate_limit: #{rate_limit} req/min)")
         {:ok, state}
 
       {:error, reason} ->
@@ -109,9 +136,42 @@ defmodule ObservLib.Metrics.PrometheusReader do
       port: state.port,
       scrape_count: state.scrape_count,
       error_count: state.error_count,
-      last_scrape_time: state.last_scrape_time
+      last_scrape_time: state.last_scrape_time,
+      active_connections: state.active_connections,
+      max_connections: state.max_connections
     }
     {:reply, stats, state}
+  end
+
+  @impl true
+  def handle_info({:new_connection, socket}, state) do
+    if state.active_connections >= state.max_connections do
+      Logger.warning("Prometheus connection limit exceeded (#{state.active_connections}/#{state.max_connections})")
+      :gen_tcp.close(socket)
+      {:noreply, state}
+    else
+      case check_rate_limit(state.rate_limiter) do
+        {:ok, new_limiter} ->
+          spawn(fn -> handle_request(socket, self(), state.basic_auth) end)
+          {:noreply, %{state |
+            active_connections: state.active_connections + 1,
+            rate_limiter: new_limiter
+          }}
+
+        {:rate_limited, new_limiter} ->
+          Logger.warning("Prometheus rate limit exceeded")
+          send_rate_limit_response(socket)
+          :gen_tcp.close(socket)
+          {:noreply, %{state | rate_limiter: new_limiter}}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:connection_closed}, state) do
+    {:noreply, %{state |
+      active_connections: max(0, state.active_connections - 1)
+    }}
   end
 
   @impl true
@@ -149,8 +209,8 @@ defmodule ObservLib.Metrics.PrometheusReader do
   defp accept_loop(listen_socket, parent) do
     case :gen_tcp.accept(listen_socket) do
       {:ok, client_socket} ->
-        # Handle request in a separate process
-        spawn(fn -> handle_request(client_socket, parent) end)
+        # Send new connection to GenServer for rate limiting and auth
+        send(parent, {:new_connection, client_socket})
         accept_loop(listen_socket, parent)
 
       {:error, :closed} ->
@@ -163,20 +223,27 @@ defmodule ObservLib.Metrics.PrometheusReader do
     end
   end
 
-  defp handle_request(socket, parent) do
-    result = do_handle_request(socket)
+  defp handle_request(socket, parent, basic_auth) do
+    result = do_handle_request(socket, basic_auth)
     send(parent, {:scrape_complete, result})
     :gen_tcp.close(socket)
+    send(parent, {:connection_closed})
   end
 
-  defp do_handle_request(socket) do
+  defp do_handle_request(socket, basic_auth) do
     case :gen_tcp.recv(socket, 0, 5000) do
       {:ok, {:http_request, :GET, {:abs_path, "/metrics"}, _version}} ->
-        # Consume headers
-        consume_headers(socket)
-        # Send metrics response
-        send_metrics_response(socket)
-        :ok
+        # Collect headers for authentication
+        headers = collect_headers(socket)
+
+        # Check authentication
+        if authorized?(headers, basic_auth) do
+          send_metrics_response(socket)
+          :ok
+        else
+          send_unauthorized_response(socket)
+          :error
+        end
 
       {:ok, {:http_request, :GET, {:abs_path, _path}, _version}} ->
         # 404 for non-metrics paths
@@ -193,6 +260,29 @@ defmodule ObservLib.Metrics.PrometheusReader do
       {:error, reason} ->
         Logger.debug("Request error: #{inspect(reason)}")
         :error
+    end
+  end
+
+  defp collect_headers(socket) do
+    collect_headers(socket, %{})
+  end
+
+  defp collect_headers(socket, headers) do
+    case :gen_tcp.recv(socket, 0, 5000) do
+      {:ok, :http_eoh} ->
+        headers
+
+      {:ok, {:http_header, _, 'Authorization', _, value}} ->
+        collect_headers(socket, Map.put(headers, :authorization, to_string(value)))
+
+      {:ok, {:http_header, _, :Authorization, _, value}} ->
+        collect_headers(socket, Map.put(headers, :authorization, to_string(value)))
+
+      {:ok, {:http_header, _, _, _, _}} ->
+        collect_headers(socket, headers)
+
+      {:error, _} ->
+        headers
     end
   end
 
@@ -246,6 +336,81 @@ defmodule ObservLib.Metrics.PrometheusReader do
       body
     ]
     :gen_tcp.send(socket, response)
+  end
+
+  defp send_unauthorized_response(socket) do
+    body = "Unauthorized"
+    response = [
+      "HTTP/1.1 401 Unauthorized\r\n",
+      "WWW-Authenticate: Basic realm=\"Prometheus Metrics\"\r\n",
+      "Content-Type: text/plain\r\n",
+      "Content-Length: #{byte_size(body)}\r\n",
+      "\r\n",
+      body
+    ]
+    :gen_tcp.send(socket, response)
+  end
+
+  defp send_rate_limit_response(socket) do
+    body = "Too Many Requests"
+    response = [
+      "HTTP/1.1 429 Too Many Requests\r\n",
+      "Content-Type: text/plain\r\n",
+      "Content-Length: #{byte_size(body)}\r\n",
+      "\r\n",
+      body
+    ]
+    :gen_tcp.send(socket, response)
+  end
+
+  # Rate Limiting Functions
+
+  defp init_rate_limiter(rate_per_minute) do
+    %{
+      tokens: rate_per_minute,
+      max_tokens: rate_per_minute,
+      last_refill: System.monotonic_time(:millisecond)
+    }
+  end
+
+  defp check_rate_limit(limiter) do
+    now = System.monotonic_time(:millisecond)
+    elapsed = now - limiter.last_refill
+
+    # Refill tokens based on elapsed time (tokens per millisecond)
+    tokens_to_add = div(elapsed * limiter.max_tokens, 60_000)
+    new_tokens = min(limiter.tokens + tokens_to_add, limiter.max_tokens)
+
+    new_limiter = %{limiter |
+      tokens: new_tokens,
+      last_refill: if(tokens_to_add > 0, do: now, else: limiter.last_refill)
+    }
+
+    if new_limiter.tokens > 0 do
+      {:ok, %{new_limiter | tokens: new_limiter.tokens - 1}}
+    else
+      {:rate_limited, new_limiter}
+    end
+  end
+
+  # Authentication Functions
+
+  defp authorized?(_headers, nil), do: true
+
+  defp authorized?(headers, {username, password}) do
+    case Map.get(headers, :authorization) do
+      "Basic " <> encoded ->
+        case Base.decode64(encoded) do
+          {:ok, credentials} ->
+            credentials == "#{username}:#{password}"
+
+          :error ->
+            false
+        end
+
+      _ ->
+        false
+    end
   end
 
   # Prometheus Format Functions
@@ -352,11 +517,35 @@ defmodule ObservLib.Metrics.PrometheusReader do
     |> String.replace(~r/^[^a-zA-Z_]/, "_")
   end
 
-  defp escape_label_value(value) do
+  defp escape_label_value(value) when is_binary(value) do
     value
-    |> String.replace("\\", "\\\\")
-    |> String.replace("\"", "\\\"")
-    |> String.replace("\n", "\\n")
+    |> String.replace("\\", "\\\\")     # Backslash first!
+    |> String.replace("\"", "\\\"")     # Double quote
+    |> String.replace("\n", "\\n")      # Newline
+    |> String.replace("\r", "\\r")      # Carriage return
+    |> String.replace("\t", "\\t")      # Tab
+    |> escape_control_chars()           # All other control chars
+  end
+
+  defp escape_label_value(value), do: escape_label_value(to_string(value))
+
+  defp escape_control_chars(value) do
+    value
+    |> String.to_charlist()
+    |> Enum.map(fn
+      char when char < 32 or char == 127 ->
+        # Escape control characters as \xHH (except already-escaped \n, \r, \t)
+        case char do
+          10 -> "\\n"  # \n (already handled)
+          13 -> "\\r"  # \r (already handled)
+          9 -> "\\t"   # \t (already handled)
+          0 -> "\\x00" # Null byte
+          _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16), 2, "0")
+        end
+      char ->
+        <<char::utf8>>
+    end)
+    |> Enum.join()
   end
 
   defp type_to_prometheus(:counter), do: "counter"

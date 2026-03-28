@@ -50,8 +50,11 @@ defmodule ObservLib.Logs do
     # Normalize attributes to a map
     attrs = normalize_attributes(attributes)
 
+    # Validate and sanitize attributes
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attrs)
+
     # Merge with process context if available
-    merged_attrs = merge_with_context(attrs)
+    merged_attrs = merge_with_context(safe_attrs)
 
     # Log with metadata
     Logger.log(level, message, merged_attrs)

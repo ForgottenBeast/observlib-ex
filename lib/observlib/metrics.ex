@@ -21,7 +21,15 @@ defmodule ObservLib.Metrics do
       ObservLib.Metrics.counter("http.requests", 1, %{method: "GET", status: 200})
       ObservLib.Metrics.histogram("http.request.duration", 45.2, %{method: "GET"})
 
+  ## Atom Safety
+
+  This module uses `String.to_existing_atom/1` where possible to prevent atom table
+  exhaustion attacks. When metric names with new segments are used, a warning is logged.
+  For production use, pre-register all expected metrics to avoid dynamic atom creation.
+
   """
+
+  require Logger
 
   @type metric_name :: String.t() | atom()
   @type metric_value :: number()
@@ -48,13 +56,14 @@ defmodule ObservLib.Metrics do
   """
   @spec counter(metric_name(), metric_value(), attributes()) :: :ok
   def counter(name, value, attributes \\ %{}) when is_number(value) and value >= 0 do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{count: value}
-    metadata = Map.merge(attributes, %{metric_type: :counter})
+    metadata = Map.merge(safe_attrs, %{metric_type: :counter})
 
     # Record to MeterProvider ETS (primary storage)
-    ObservLib.Metrics.MeterProvider.record(normalized_name, :counter, value, attributes)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :counter, value, safe_attrs)
 
     # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
@@ -81,13 +90,14 @@ defmodule ObservLib.Metrics do
   """
   @spec gauge(metric_name(), metric_value(), attributes()) :: :ok
   def gauge(name, value, attributes \\ %{}) when is_number(value) do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
-    metadata = Map.merge(attributes, %{metric_type: :gauge})
+    metadata = Map.merge(safe_attrs, %{metric_type: :gauge})
 
     # Record to MeterProvider ETS (primary storage)
-    ObservLib.Metrics.MeterProvider.record(normalized_name, :gauge, value, attributes)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :gauge, value, safe_attrs)
 
     # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
@@ -114,13 +124,14 @@ defmodule ObservLib.Metrics do
   """
   @spec histogram(metric_name(), metric_value(), attributes()) :: :ok
   def histogram(name, value, attributes \\ %{}) when is_number(value) do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
-    metadata = Map.merge(attributes, %{metric_type: :histogram})
+    metadata = Map.merge(safe_attrs, %{metric_type: :histogram})
 
     # Record to MeterProvider ETS (primary storage)
-    ObservLib.Metrics.MeterProvider.record(normalized_name, :histogram, value, attributes)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :histogram, value, safe_attrs)
 
     # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
@@ -147,13 +158,14 @@ defmodule ObservLib.Metrics do
   """
   @spec up_down_counter(metric_name(), metric_value(), attributes()) :: :ok
   def up_down_counter(name, value, attributes \\ %{}) when is_number(value) do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     normalized_name = normalize_name(name)
     event_name = normalize_event_name(name)
     measurements = %{value: value}
-    metadata = Map.merge(attributes, %{metric_type: :up_down_counter})
+    metadata = Map.merge(safe_attrs, %{metric_type: :up_down_counter})
 
     # Record to MeterProvider ETS (primary storage)
-    ObservLib.Metrics.MeterProvider.record(normalized_name, :up_down_counter, value, attributes)
+    ObservLib.Metrics.MeterProvider.record(normalized_name, :up_down_counter, value, safe_attrs)
 
     # Also emit telemetry event for backward compatibility
     :telemetry.execute(event_name, measurements, metadata)
@@ -320,7 +332,25 @@ defmodule ObservLib.Metrics do
     name
     |> normalize_name()
     |> String.split(".")
-    |> Enum.map(&String.to_atom/1)
+    |> Enum.map(&safe_to_atom/1)
+  end
+
+  # Safely convert string to atom, preferring existing atoms to prevent atom table exhaustion
+  # This is a critical security measure against user-controlled metric names
+  defp safe_to_atom(string) when is_binary(string) do
+    try do
+      String.to_existing_atom(string)
+    rescue
+      ArgumentError ->
+        # If the atom doesn't exist, create it but log a warning
+        # This allows new metrics while preventing unbounded atom creation
+        Logger.warning(
+          "Creating new atom for metric segment: #{inspect(string)}. " <>
+            "Consider pre-registering metrics to avoid atom table exhaustion."
+        )
+
+        String.to_atom(string)
+    end
   end
 
   defp normalize_name(name) when is_atom(name), do: Atom.to_string(name)

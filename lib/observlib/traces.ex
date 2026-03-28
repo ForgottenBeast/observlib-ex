@@ -26,8 +26,9 @@ defmodule ObservLib.Traces do
 
   """
   def start_span(name, attributes \\ %{}) do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     tracer = :opentelemetry.get_tracer(:observlib)
-    opts = %{attributes: attributes}
+    opts = %{attributes: safe_attrs}
     :otel_tracer.start_span(tracer, name, opts)
   end
 
@@ -188,8 +189,9 @@ defmodule ObservLib.Traces do
 
   """
   def with_span(name, attributes \\ %{}, fun) when is_function(fun, 0) do
+    {:ok, safe_attrs} = ObservLib.Attributes.validate(attributes)
     tracer = :opentelemetry.get_tracer(:observlib)
-    opts = %{attributes: attributes}
+    opts = %{attributes: safe_attrs}
 
     :otel_tracer.with_span(tracer, name, opts, fn _span_ctx ->
       fun.()

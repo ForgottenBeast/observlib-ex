@@ -124,7 +124,7 @@ defmodule ObservLib.Traces.PyroscopeProcessor do
     end
 
     # Create ETS table for profile data
-    table = :ets.new(@ets_table, [:set, :public, :named_table, read_concurrency: true])
+    table = :ets.new(@ets_table, [:set, :protected, :named_table, read_concurrency: true])
 
     state = %{
       table: table,

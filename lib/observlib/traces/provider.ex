@@ -149,7 +149,7 @@ defmodule ObservLib.Traces.Provider do
   @impl true
   def init(opts) do
     # Create ETS table owned by this process
-    table = :ets.new(@ets_table, [:set, :public, :named_table, read_concurrency: true])
+    table = :ets.new(@ets_table, [:set, :protected, :named_table, read_concurrency: true])
 
     cleanup_interval = Keyword.get(opts, :cleanup_interval, @default_cleanup_interval)
     stale_timeout = Keyword.get(opts, :stale_span_timeout, @default_stale_span_timeout)
@@ -169,23 +169,37 @@ defmodule ObservLib.Traces.Provider do
 
   @impl true
   def handle_cast({:track_span, span_ctx, name, attributes}, state) do
-    span_id = extract_span_id(span_ctx)
-    parent_id = extract_parent_span_id(span_ctx)
+    # Check span limit before inserting (SEC-013: M-04)
+    max_spans = ObservLib.Config.get(:max_active_spans, 10_000)
+    current_count = :ets.info(@ets_table, :size)
 
-    span_info = {
-      span_id,
-      %{
-        span_id: span_id,
-        name: name,
-        attributes: attributes,
-        parent_span_id: parent_id,
-        start_time: System.monotonic_time(:millisecond),
-        pid: self()
+    if current_count >= max_spans do
+      Logger.warning("Max active spans limit reached, rejecting new span",
+        limit: max_spans,
+        current: current_count,
+        span_name: name
+      )
+
+      {:noreply, state}
+    else
+      span_id = extract_span_id(span_ctx)
+      parent_id = extract_parent_span_id(span_ctx)
+
+      span_info = {
+        span_id,
+        %{
+          span_id: span_id,
+          name: name,
+          attributes: attributes,
+          parent_span_id: parent_id,
+          start_time: System.monotonic_time(:millisecond),
+          pid: self()
+        }
       }
-    }
 
-    :ets.insert(@ets_table, span_info)
-    {:noreply, state}
+      :ets.insert(@ets_table, span_info)
+      {:noreply, state}
+    end
   end
 
   @impl true

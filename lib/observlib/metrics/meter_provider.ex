@@ -127,14 +127,14 @@ defmodule ObservLib.Metrics.MeterProvider do
     # Create ETS tables owned by this process
     metrics_table = :ets.new(@metrics_table, [
       :set,
-      :public,  # Public for reads, writes go through GenServer
+      :protected,  # Protected: only owner can write, others can read
       :named_table,
       read_concurrency: true
     ])
 
     registry_table = :ets.new(@registry_table, [
       :set,
-      :public,
+      :protected,
       :named_table,
       read_concurrency: true
     ])
@@ -144,7 +144,8 @@ defmodule ObservLib.Metrics.MeterProvider do
 
     state = %{
       metrics_table: metrics_table,
-      registry_table: registry_table
+      registry_table: registry_table,
+      cardinality_tracker: %{}  # Track cardinality per metric name
     }
 
     Logger.debug("MeterProvider started with ETS tables")
@@ -213,8 +214,24 @@ defmodule ObservLib.Metrics.MeterProvider do
   @impl true
   def handle_cast({:record, name, type, value, attributes}, state) do
     key = {name, normalize_attributes(attributes)}
-    record_metric(key, type, value)
-    {:noreply, state}
+
+    # Check cardinality limit (sec-003)
+    cardinality_limit = ObservLib.Config.cardinality_limit()
+
+    case check_cardinality_limit(state.metrics_table, key, name, cardinality_limit) do
+      :ok ->
+        record_metric(key, type, value)
+        {:noreply, state}
+
+      :limit_exceeded ->
+        # Log warning but don't crash - drop the metric
+        Logger.warning("Metric cardinality limit exceeded, dropping metric",
+          metric: name,
+          limit: cardinality_limit,
+          attributes: attributes
+        )
+        {:noreply, state}
+    end
   end
 
   @impl true
@@ -226,9 +243,22 @@ defmodule ObservLib.Metrics.MeterProvider do
 
     value = extract_value(metric_type, measurements)
     key = {metric_name, normalize_attributes(attributes)}
-    record_metric(key, metric_type, value)
 
-    {:noreply, state}
+    # Check cardinality limit (sec-003)
+    cardinality_limit = ObservLib.Config.cardinality_limit()
+
+    case check_cardinality_limit(state.metrics_table, key, metric_name, cardinality_limit) do
+      :ok ->
+        record_metric(key, metric_type, value)
+        {:noreply, state}
+
+      :limit_exceeded ->
+        Logger.warning("Metric cardinality limit exceeded, dropping metric",
+          metric: metric_name,
+          limit: cardinality_limit
+        )
+        {:noreply, state}
+    end
   end
 
   @impl true
@@ -241,6 +271,32 @@ defmodule ObservLib.Metrics.MeterProvider do
   end
 
   # Private Functions
+
+  defp check_cardinality_limit(table, key, name, limit) do
+    # If the key already exists, allow the update
+    case :ets.lookup(table, key) do
+      [{^key, _}] ->
+        :ok
+
+      [] ->
+        # Count current cardinality for this metric name
+        current_count = count_metric_variants(table, name)
+
+        if current_count >= limit do
+          :limit_exceeded
+        else
+          :ok
+        end
+    end
+  end
+
+  defp count_metric_variants(table, name) do
+    # Use match_spec to count entries where the key's first element matches name
+    match_spec = [
+      {{{:"$1", :_}, :_}, [{:==, :"$1", name}], [true]}
+    ]
+    :ets.select_count(table, match_spec)
+  end
 
   defp attach_telemetry_handler do
     handler_id = :observlib_meter_provider_handler

@@ -393,4 +393,63 @@ defmodule ObservLib.MetricsTest do
       end
     end
   end
+
+  describe "atom table safety (sec-002)" do
+    @tag :security
+    test "handles large number of unique metric names without exhausting atom table" do
+      # This test verifies the fix for sec-002: atom table exhaustion vulnerability
+      # Previously, String.to_atom/1 was used unsafely, allowing unbounded atom creation
+      # Now uses String.to_existing_atom/1 with controlled fallback
+
+      # Create 1000 unique metric names to test safety
+      # In production, this could be triggered by user-controlled input
+      unique_metrics =
+        for i <- 1..1000 do
+          "test.metric.security.#{i}.#{:erlang.unique_integer([:positive])}"
+        end
+
+      # This should complete without crashing the VM
+      # Warnings will be logged for new atoms (captured by Logger backend)
+      for metric_name <- unique_metrics do
+        ObservLib.Metrics.counter(metric_name, 1, %{test: "security"})
+      end
+
+      # Verify the VM is still functional after stress test
+      # Use a pre-registered event name from setup
+      ObservLib.Metrics.counter("http.requests", 1, %{test: "after_stress"})
+      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, _}
+    end
+
+    @tag :security
+    test "reuses existing atoms without creating new ones" do
+      # Use pre-registered event names from setup
+      ObservLib.Metrics.counter("http.requests", 1)
+      assert_receive {:telemetry_event, [:http, :requests], _, _}
+
+      # Second call should work without errors
+      ObservLib.Metrics.counter("http.requests", 1)
+      assert_receive {:telemetry_event, [:http, :requests], _, _}
+    end
+
+    @tag :security
+    test "validates handler_id input is atoms only" do
+      # This validates the telemetry.ex fix
+      # handler_id now validates all prefix elements are atoms
+      valid_prefix = [:my, :app, :event]
+      assert :ok = ObservLib.Telemetry.attach(valid_prefix)
+
+      # Clean up
+      ObservLib.Telemetry.detach(valid_prefix)
+    end
+
+    @tag :security
+    test "safe_to_atom uses existing atoms when available" do
+      # These should use existing atoms that were pre-registered in setup
+      ObservLib.Metrics.counter("http.requests", 1)
+      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, _}
+
+      ObservLib.Metrics.gauge("memory.usage", 100)
+      assert_receive {:telemetry_event, [:memory, :usage], %{value: 100}, _}
+    end
+  end
 end

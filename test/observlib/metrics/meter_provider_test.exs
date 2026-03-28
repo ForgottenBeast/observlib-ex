@@ -243,4 +243,99 @@ defmodule ObservLib.Metrics.MeterProviderTest do
       assert metric.description == "Test metric"
     end
   end
+
+  describe "cardinality limit (sec-003)" do
+    test "enforces cardinality limit per metric name" do
+      # Get configured limit
+      limit = ObservLib.Config.cardinality_limit()
+
+      # Record metrics up to the limit
+      for i <- 1..limit do
+        MeterProvider.record("test.cardinality", :counter, 1, %{unique_id: i})
+      end
+
+      Process.sleep(50)
+
+      # All metrics should be recorded
+      metrics = MeterProvider.read("test.cardinality")
+      assert length(metrics) == limit
+
+      # Try to record beyond the limit - should be dropped
+      MeterProvider.record("test.cardinality", :counter, 1, %{unique_id: limit + 1})
+      MeterProvider.record("test.cardinality", :counter, 1, %{unique_id: limit + 2})
+
+      Process.sleep(50)
+
+      # Should still only have limit entries
+      metrics = MeterProvider.read("test.cardinality")
+      assert length(metrics) == limit
+    end
+
+    test "allows updates to existing metric variants" do
+      limit = ObservLib.Config.cardinality_limit()
+
+      # Fill up to limit
+      for i <- 1..limit do
+        MeterProvider.record("test.update", :counter, 1, %{id: i})
+      end
+
+      Process.sleep(50)
+
+      # Update an existing variant - should succeed
+      MeterProvider.record("test.update", :counter, 5, %{id: 1})
+
+      Process.sleep(50)
+
+      metrics = MeterProvider.read("test.update")
+      metric_1 = Enum.find(metrics, &(&1.attributes.id == 1))
+      # Counter should have incremented: 1 + 5 = 6
+      assert metric_1.data.value == 6
+    end
+
+    test "limit applies per metric name independently" do
+      # Reset to clean state
+      MeterProvider.reset()
+
+      # Record 10 variants for metric A
+      for i <- 1..10 do
+        MeterProvider.record("metric.a", :counter, 1, %{id: i})
+      end
+
+      # Record 10 variants for metric B
+      for i <- 1..10 do
+        MeterProvider.record("metric.b", :counter, 1, %{id: i})
+      end
+
+      Process.sleep(50)
+
+      # Both should succeed independently
+      metrics_a = MeterProvider.read("metric.a")
+      metrics_b = MeterProvider.read("metric.b")
+
+      assert length(metrics_a) == 10
+      assert length(metrics_b) == 10
+    end
+
+    test "logs warning when cardinality limit exceeded" do
+      import ExUnit.CaptureLog
+
+      limit = ObservLib.Config.cardinality_limit()
+
+      # Fill to limit
+      for i <- 1..limit do
+        MeterProvider.record("test.warning", :counter, 1, %{id: i})
+      end
+
+      Process.sleep(50)
+
+      # Capture log when exceeding limit
+      log = capture_log(fn ->
+        MeterProvider.record("test.warning", :counter, 1, %{id: limit + 1})
+        Process.sleep(50)
+      end)
+
+      assert log =~ "Metric cardinality limit exceeded"
+      assert log =~ "test.warning"
+    end
+  end
 end
