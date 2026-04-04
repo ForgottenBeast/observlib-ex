@@ -47,7 +47,8 @@ defmodule MyApp.Worker do
 end
 ```
 
-## Context Propagation
+
+## Cross-Process Tracing
 
 ### Same-Process Spans
 
@@ -70,25 +71,46 @@ Result: `parent` span with two children.
 
 ### Cross-Process Spans
 
-For GenServer calls, pass context explicitly:
+> **See Also:** [Context Propagation Guide](../concepts/context-propagation.md) for comprehensive coverage of cross-process tracing patterns.
+
+When spawning processes or calling GenServers, trace context must be manually propagated:
+
+**Task.async Pattern:**
+
+```elixir
+ObservLib.traced("parent", fn ->
+  # Capture context before spawning
+  ctx = :otel_ctx.get_current()
+
+  task = Task.async(fn ->
+    # Attach context in child process
+    :otel_ctx.attach(ctx)
+
+    ObservLib.traced("async_work", fn ->
+      expensive_operation()
+    end)
+  end)
+
+  Task.await(task)
+end)
+```
+
+**GenServer Pattern:**
 
 ```elixir
 defmodule MyApp.Worker do
   use GenServer
 
   def process(data) do
-    # Capture current context
-    ctx = ObservLib.Traces.current_context()
-
-    # Send to GenServer
+    # Capture context in caller
+    ctx = :otel_ctx.get_current()
     GenServer.call(__MODULE__, {:process, data, ctx})
   end
 
   def handle_call({:process, data, ctx}, _from, state) do
-    # Restore context
-    ObservLib.Traces.set_context(ctx)
+    # Attach context in GenServer process
+    :otel_ctx.attach(ctx)
 
-    # Work is now part of the same trace
     result = ObservLib.traced("worker_process", fn ->
       do_work(data)
     end)
@@ -97,6 +119,8 @@ defmodule MyApp.Worker do
   end
 end
 ```
+
+For more patterns including spawn, GenServer cast, and reusable helpers, see the [Context Propagation Guide](../concepts/context-propagation.md).
 
 ### HTTP Propagation
 
