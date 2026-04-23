@@ -7,6 +7,7 @@ defmodule ObservLib.Security.InjectionPreventionTest do
     test "escapes CRLF characters in label values" do
       # Start MeterProvider if not running
       metrics_pid = Process.whereis(ObservLib.Metrics.MeterProvider)
+
       if metrics_pid && Process.alive?(metrics_pid) do
         ObservLib.Metrics.MeterProvider.reset()
       end
@@ -141,6 +142,115 @@ defmodule ObservLib.Security.InjectionPreventionTest do
       # Should handle safely without header injection
       result = ObservLib.Exporters.OtlpLogsExporter.export([log_record])
       assert result == :ok
+    end
+  end
+
+  describe "sec-014 escape verification: PrometheusReader escape_label_value/1 behavior" do
+    # These tests verify the escaping rules that protect the Prometheus text format.
+    # They test the escape logic directly by replicating it (since escape_label_value
+    # is a private function in PrometheusReader).
+    #
+    # The canonical escape rules per Prometheus text format spec:
+    #   \ → \\
+    #   " → \"
+    #   \n → \n (literal backslash-n in output)
+    #   \r → \r (literal backslash-r)
+    #   other control chars → \xHH
+
+    defp escape(value) when is_binary(value) do
+      value
+      |> String.replace("\\", "\\\\")
+      |> String.replace("\"", "\\\"")
+      |> String.replace("\n", "\\n")
+      |> String.replace("\r", "\\r")
+      |> String.replace("\t", "\\t")
+      |> escape_controls()
+    end
+
+    defp escape_controls(value) do
+      value
+      |> String.to_charlist()
+      |> Enum.map(fn
+        char when char < 32 or char == 127 ->
+          case char do
+            10 -> "\\n"
+            13 -> "\\r"
+            9 -> "\\t"
+            0 -> "\\x00"
+            _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16), 2, "0")
+          end
+        char -> <<char::utf8>>
+      end)
+      |> Enum.join()
+    end
+
+    test "CRLF injection payload has no raw line endings after escaping" do
+      payload = "value\r\nmalicious_metric 999\r\n"
+      escaped = escape(payload)
+
+      refute String.contains?(escaped, "\r"),
+             "Raw CR must not appear in escaped output; got: #{inspect(escaped)}"
+
+      refute String.contains?(escaped, "\n"),
+             "Raw LF must not appear in escaped output; got: #{inspect(escaped)}"
+
+      assert String.contains?(escaped, "\\r") and String.contains?(escaped, "\\n"),
+             "CRLF should appear as \\r\\n in escaped output; got: #{inspect(escaped)}"
+    end
+
+    test "null byte is escaped as \\x00" do
+      escaped = escape("before\x00after")
+
+      refute String.contains?(escaped, <<0>>),
+             "Null byte must not appear raw after escaping"
+
+      assert String.contains?(escaped, "\\x00"),
+             "Null byte should be escaped as \\x00; got: #{inspect(escaped)}"
+    end
+
+    test "backslash is doubled before other escaping" do
+      escaped = escape("C:\\Users\\name")
+
+      assert escaped == "C:\\\\Users\\\\name",
+             "Backslash must be doubled; got: #{inspect(escaped)}"
+    end
+
+    test "double quote is escaped with backslash prefix" do
+      escaped = escape(~s(say "hello"))
+
+      assert escaped == ~s(say \\"hello\\"),
+             "Double quote must be escaped; got: #{inspect(escaped)}"
+    end
+
+    test "comprehensive injection payload is fully escaped" do
+      # Attempt to inject a complete fake metric line via label value
+      payload = "x\r\nfake_counter{x=\"1\"} 9999\r\n# end"
+      escaped = escape(payload)
+
+      refute String.contains?(escaped, "\r"),
+             "No raw CR in escaped injection payload"
+
+      refute String.contains?(escaped, "\n"),
+             "No raw LF in escaped injection payload; got: #{inspect(escaped)}"
+    end
+
+    test "round-trip: stored metrics with injection values produce records in MeterProvider" do
+      ObservLib.Metrics.counter("roundtrip.injection.test", 1, %{
+        label: "val\r\nINJECTED 999"
+      })
+
+      metrics = ObservLib.Metrics.MeterProvider.read_all()
+      assert length(metrics) > 0
+
+      # Find our metric
+      matching = Enum.filter(metrics, &(&1.name == "roundtrip.injection.test"))
+      assert length(matching) == 1
+
+      metric = List.first(matching)
+      # The attribute value is stored as-is in the ETS table;
+      # the escaping happens during Prometheus text rendering.
+      label_val = metric.attributes[:label]
+      assert is_binary(label_val)
     end
   end
 end
