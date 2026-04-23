@@ -298,10 +298,12 @@ defmodule ObservLib.Pyroscope.Client do
     # Upload to Pyroscope
     case upload_profile(profile_data, labels_with_trace, state) do
       :ok ->
-        new_state = %{state |
-          last_upload: System.system_time(:second),
-          upload_count: state.upload_count + 1
+        new_state = %{
+          state
+          | last_upload: System.system_time(:second),
+            upload_count: state.upload_count + 1
         }
+
         {:ok, new_state}
 
       {:error, reason} ->

@@ -114,9 +114,10 @@ defmodule ObservLib.HTTP do
     Map.new(error_context, fn {key, value} ->
       key_lower = String.downcase(to_string(key))
 
-      should_redact = Enum.any?(sensitive_patterns, fn pattern ->
-        String.contains?(key_lower, pattern)
-      end)
+      should_redact =
+        Enum.any?(sensitive_patterns, fn pattern ->
+          String.contains?(key_lower, pattern)
+        end)
 
       if should_redact do
         {key, "[REDACTED]"}

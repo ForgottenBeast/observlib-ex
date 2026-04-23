@@ -192,7 +192,7 @@ defmodule ObservLib.Logs do
         # Logs will include request_id: "abc-123"
       end)
   """
-  @spec with_context(attributes(), (() -> result)) :: result when result: any()
+  @spec with_context(attributes(), (-> result)) :: result when result: any()
   def with_context(context, fun) when is_function(fun, 0) do
     # Normalize context to a map
     ctx_map = normalize_attributes(context)

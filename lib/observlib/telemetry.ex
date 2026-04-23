@@ -80,10 +80,11 @@ defmodule ObservLib.Telemetry do
         attach(prefix)
       end)
 
-    errors = Enum.filter(results, fn
-      {:error, _} -> true
-      _ -> false
-    end)
+    errors =
+      Enum.filter(results, fn
+        {:error, _} -> true
+        _ -> false
+      end)
 
     case errors do
       [] -> :ok

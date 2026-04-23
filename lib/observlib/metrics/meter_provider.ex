@@ -125,19 +125,22 @@ defmodule ObservLib.Metrics.MeterProvider do
   @impl true
   def init(_opts) do
     # Create ETS tables owned by this process
-    metrics_table = :ets.new(@metrics_table, [
-      :set,
-      :protected,  # Protected: only owner can write, others can read
-      :named_table,
-      read_concurrency: true
-    ])
+    metrics_table =
+      :ets.new(@metrics_table, [
+        :set,
+        # Protected: only owner can write, others can read
+        :protected,
+        :named_table,
+        read_concurrency: true
+      ])
 
-    registry_table = :ets.new(@registry_table, [
-      :set,
-      :protected,
-      :named_table,
-      read_concurrency: true
-    ])
+    registry_table =
+      :ets.new(@registry_table, [
+        :set,
+        :protected,
+        :named_table,
+        read_concurrency: true
+      ])
 
     # Attach telemetry handler
     attach_telemetry_handler()
@@ -145,7 +148,8 @@ defmodule ObservLib.Metrics.MeterProvider do
     state = %{
       metrics_table: metrics_table,
       registry_table: registry_table,
-      cardinality_tracker: %{}  # Track cardinality per metric name
+      # Track cardinality per metric name
+      cardinality_tracker: %{}
     }
 
     Logger.debug("MeterProvider started with ETS tables")
@@ -168,30 +172,32 @@ defmodule ObservLib.Metrics.MeterProvider do
 
   @impl true
   def handle_call(:read_all, _from, state) do
-    metrics = :ets.tab2list(@metrics_table)
-    |> Enum.map(fn {{name, attributes}, data} ->
-      %{
-        name: name,
-        attributes: attributes,
-        type: data.type,
-        data: format_metric_data(data)
-      }
-    end)
+    metrics =
+      :ets.tab2list(@metrics_table)
+      |> Enum.map(fn {{name, attributes}, data} ->
+        %{
+          name: name,
+          attributes: attributes,
+          type: data.type,
+          data: format_metric_data(data)
+        }
+      end)
 
     {:reply, metrics, state}
   end
 
   @impl true
   def handle_call({:read, name}, _from, state) do
-    metrics = :ets.match_object(@metrics_table, {{name, :_}, :_})
-    |> Enum.map(fn {{_name, attributes}, data} ->
-      %{
-        name: name,
-        attributes: attributes,
-        type: data.type,
-        data: format_metric_data(data)
-      }
-    end)
+    metrics =
+      :ets.match_object(@metrics_table, {{name, :_}, :_})
+      |> Enum.map(fn {{_name, attributes}, data} ->
+        %{
+          name: name,
+          attributes: attributes,
+          type: data.type,
+          data: format_metric_data(data)
+        }
+      end)
 
     result = if Enum.empty?(metrics), do: nil, else: metrics
     {:reply, result, state}
@@ -200,13 +206,15 @@ defmodule ObservLib.Metrics.MeterProvider do
   @impl true
   def handle_call(:reset, _from, state) do
     :ets.delete_all_objects(@metrics_table)
+    :ets.delete_all_objects(@registry_table)
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_call(:list_registered, _from, state) do
-    registered = :ets.tab2list(@registry_table)
-    |> Enum.map(fn {_name, definition} -> definition end)
+    registered =
+      :ets.tab2list(@registry_table)
+      |> Enum.map(fn {_name, definition} -> definition end)
 
     {:reply, registered, state}
   end
@@ -230,6 +238,7 @@ defmodule ObservLib.Metrics.MeterProvider do
           limit: cardinality_limit,
           attributes: attributes
         )
+
         {:noreply, state}
     end
   end
@@ -257,6 +266,7 @@ defmodule ObservLib.Metrics.MeterProvider do
           metric: metric_name,
           limit: cardinality_limit
         )
+
         {:noreply, state}
     end
   end
@@ -295,6 +305,7 @@ defmodule ObservLib.Metrics.MeterProvider do
     match_spec = [
       {{{:"$1", :_}, :_}, [{:==, :"$1", name}], [true]}
     ]
+
     :ets.select_count(table, match_spec)
   end
 
@@ -302,7 +313,7 @@ defmodule ObservLib.Metrics.MeterProvider do
     handler_id = :observlib_meter_provider_handler
     pid = self()
 
-    handler_fun = fn event_name, measurements, metadata, _config ->
+    _handler_fun = fn event_name, measurements, metadata, _config ->
       # Only handle events with metric_type in metadata
       if Map.has_key?(metadata, :metric_type) do
         send(pid, {:telemetry_event, event_name, measurements, metadata})
@@ -327,14 +338,17 @@ defmodule ObservLib.Metrics.MeterProvider do
           value: value,
           timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, data})
 
       [{^key, existing}] ->
         # Atomic increment
-        updated = %{existing |
-          value: existing.value + value,
-          timestamp: System.system_time(:nanosecond)
+        updated = %{
+          existing
+          | value: existing.value + value,
+            timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, updated})
     end
   end
@@ -346,6 +360,7 @@ defmodule ObservLib.Metrics.MeterProvider do
       value: value,
       timestamp: System.system_time(:nanosecond)
     }
+
     :ets.insert(@metrics_table, {key, data})
   end
 
@@ -362,18 +377,21 @@ defmodule ObservLib.Metrics.MeterProvider do
           buckets: init_buckets(value, @default_bucket_boundaries),
           timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, data})
 
       [{^key, existing}] ->
         # Update histogram statistics
-        updated = %{existing |
-          count: existing.count + 1,
-          sum: existing.sum + value,
-          min: min(existing.min, value),
-          max: max(existing.max, value),
-          buckets: update_buckets(existing.buckets, value, @default_bucket_boundaries),
-          timestamp: System.system_time(:nanosecond)
+        updated = %{
+          existing
+          | count: existing.count + 1,
+            sum: existing.sum + value,
+            min: min(existing.min, value),
+            max: max(existing.max, value),
+            buckets: update_buckets(existing.buckets, value, @default_bucket_boundaries),
+            timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, updated})
     end
   end
@@ -387,14 +405,17 @@ defmodule ObservLib.Metrics.MeterProvider do
           value: value,
           timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, data})
 
       [{^key, existing}] ->
         # Update (can go negative)
-        updated = %{existing |
-          value: existing.value + value,
-          timestamp: System.system_time(:nanosecond)
+        updated = %{
+          existing
+          | value: existing.value + value,
+            timestamp: System.system_time(:nanosecond)
         }
+
         :ets.insert(@metrics_table, {key, updated})
     end
   end
@@ -430,7 +451,9 @@ defmodule ObservLib.Metrics.MeterProvider do
   defp extract_value(:gauge, measurements), do: Map.get(measurements, :value, 0)
   defp extract_value(:histogram, measurements), do: Map.get(measurements, :value, 0)
   defp extract_value(:up_down_counter, measurements), do: Map.get(measurements, :value, 0)
-  defp extract_value(_, measurements), do: Map.get(measurements, :value, Map.get(measurements, :count, 0))
+
+  defp extract_value(_, measurements),
+    do: Map.get(measurements, :value, Map.get(measurements, :count, 0))
 
   defp normalize_attributes(attributes) when is_map(attributes) do
     # Sort attributes for consistent key generation

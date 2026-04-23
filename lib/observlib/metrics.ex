@@ -324,7 +324,10 @@ defmodule ObservLib.Metrics do
   defp build_opts(definition) do
     opts = []
     opts = if definition.unit, do: [{:unit, definition.unit} | opts], else: opts
-    opts = if definition.description, do: [{:description, definition.description} | opts], else: opts
+
+    opts =
+      if definition.description, do: [{:description, definition.description} | opts], else: opts
+
     opts
   end
 

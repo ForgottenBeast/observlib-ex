@@ -6,11 +6,17 @@ import Config
 # Helper function to safely parse environment variable integers
 parse_env_integer = fn env_var, default_value ->
   case System.get_env(env_var) do
-    nil -> default_value
-    "" -> default_value
+    nil ->
+      default_value
+
+    "" ->
+      default_value
+
     value ->
       case Integer.parse(value) do
-        {timeout, _} when timeout > 0 -> timeout
+        {timeout, _} when timeout > 0 ->
+          timeout
+
         _ ->
           IO.warn("Invalid #{env_var}: #{inspect(value)}, using default #{default_value}ms")
           default_value

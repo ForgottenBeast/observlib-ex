@@ -199,7 +199,7 @@ defmodule ObservLib do
       end)
 
   """
-  @spec traced(String.t() | atom(), map(), (() -> result)) :: result when result: any()
+  @spec traced(String.t() | atom(), map(), (-> result)) :: result when result: any()
   def traced(name, attributes \\ %{}, func) when is_function(func, 0) do
     ObservLib.Traces.with_span(name, attributes, func)
   end

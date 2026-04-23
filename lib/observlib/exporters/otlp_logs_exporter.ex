@@ -152,8 +152,13 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
   def init(opts) do
     endpoint = get_config(:otlp_endpoint, @default_endpoint)
     batch_size = Keyword.get(opts, :batch_size, get_config(:logs_batch_size, @default_batch_size))
-    batch_timeout = Keyword.get(opts, :batch_timeout, get_config(:logs_batch_timeout, @default_batch_timeout))
-    max_retries = Keyword.get(opts, :max_retries, get_config(:logs_max_retries, @default_max_retries))
+
+    batch_timeout =
+      Keyword.get(opts, :batch_timeout, get_config(:logs_batch_timeout, @default_batch_timeout))
+
+    max_retries =
+      Keyword.get(opts, :max_retries, get_config(:logs_max_retries, @default_max_retries))
+
     batch_limit = Keyword.get(opts, :batch_limit, ObservLib.Config.get_log_batch_limit())
 
     state = %{
@@ -194,30 +199,47 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
     new_batch = state.batch ++ log_records
 
     # Enforce batch limit by dropping oldest logs if exceeded
-    new_batch = if length(new_batch) > state.batch_limit do
-      dropped_count = length(new_batch) - state.batch_limit
-      Logger.warning("Log batch limit exceeded, dropping oldest logs",
-        limit: state.batch_limit,
-        dropped: dropped_count
-      )
-      Enum.take(new_batch, state.batch_limit)
-    else
-      new_batch
-    end
+    new_batch =
+      if length(new_batch) > state.batch_limit do
+        dropped_count = length(new_batch) - state.batch_limit
+
+        Logger.warning("Log batch limit exceeded, dropping oldest logs",
+          limit: state.batch_limit,
+          dropped: dropped_count
+        )
+
+        Enum.take(new_batch, state.batch_limit)
+      else
+        new_batch
+      end
 
     if length(new_batch) >= state.batch_size do
       # Flush immediately if batch size reached
       cancel_timer(state.timer_ref)
+
       case do_export(new_batch, state) do
         :ok ->
-          new_state = %{state | batch: [], timer_ref: schedule_flush(state.batch_timeout), retry_count: 0}
+          new_state = %{
+            state
+            | batch: [],
+              timer_ref: schedule_flush(state.batch_timeout),
+              retry_count: 0
+          }
+
           {:noreply, new_state}
 
         {:retry, new_retry_count} ->
           # Schedule retry with exponential backoff
           retry_delay = calculate_retry_delay(new_retry_count)
           Process.send_after(self(), {:retry_export, new_batch}, retry_delay)
-          {:noreply, %{state | batch: [], timer_ref: schedule_flush(state.batch_timeout), retry_count: new_retry_count}}
+
+          {:noreply,
+           %{
+             state
+             | batch: [],
+               timer_ref: schedule_flush(state.batch_timeout),
+               retry_count: new_retry_count
+           }}
 
         {:error, reason} ->
           safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
@@ -266,6 +288,7 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
 
   defp send_to_collector(payload, state, retry_count) do
     url = "#{state.endpoint}/v1/logs"
+
     headers = [
       {"content-type", "application/json"},
       {"accept", "application/json"}
@@ -415,7 +438,13 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
         # Schedule retry with exponential backoff
         retry_delay = calculate_retry_delay(new_retry_count)
         Process.send_after(self(), {:retry_export, state.batch}, retry_delay)
-        %{state | batch: [], timer_ref: schedule_flush(state.batch_timeout), retry_count: new_retry_count}
+
+        %{
+          state
+          | batch: [],
+            timer_ref: schedule_flush(state.batch_timeout),
+            retry_count: new_retry_count
+        }
 
       {:error, reason} ->
         safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)

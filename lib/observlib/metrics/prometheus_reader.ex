@@ -85,8 +85,9 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
   @impl true
   def init(opts) do
-    port = Keyword.get(opts, :port) ||
-           Application.get_env(:observlib, :prometheus_port, @default_port)
+    port =
+      Keyword.get(opts, :port) ||
+        Application.get_env(:observlib, :prometheus_port, @default_port)
 
     max_connections = Application.get_env(:observlib, :prometheus_max_connections, 10)
     rate_limit = Application.get_env(:observlib, :prometheus_rate_limit, 100)
@@ -94,11 +95,11 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
     # Start TCP listener
     case :gen_tcp.listen(port, [
-      :binary,
-      packet: :http_bin,
-      active: false,
-      reuseaddr: true
-    ]) do
+           :binary,
+           packet: :http_bin,
+           active: false,
+           reuseaddr: true
+         ]) do
       {:ok, listen_socket} ->
         # Start accepting connections in a separate process
         acceptor_pid = spawn_link(fn -> accept_loop(listen_socket, self()) end)
@@ -116,7 +117,10 @@ defmodule ObservLib.Metrics.PrometheusReader do
           basic_auth: basic_auth
         }
 
-        Logger.info("PrometheusReader started on port #{port} (max_connections: #{max_connections}, rate_limit: #{rate_limit} req/min)")
+        Logger.info(
+          "PrometheusReader started on port #{port} (max_connections: #{max_connections}, rate_limit: #{rate_limit} req/min)"
+        )
+
         {:ok, state}
 
       {:error, reason} ->
@@ -140,23 +144,26 @@ defmodule ObservLib.Metrics.PrometheusReader do
       active_connections: state.active_connections,
       max_connections: state.max_connections
     }
+
     {:reply, stats, state}
   end
 
   @impl true
   def handle_info({:new_connection, socket}, state) do
     if state.active_connections >= state.max_connections do
-      Logger.warning("Prometheus connection limit exceeded (#{state.active_connections}/#{state.max_connections})")
+      Logger.warning(
+        "Prometheus connection limit exceeded (#{state.active_connections}/#{state.max_connections})"
+      )
+
       :gen_tcp.close(socket)
       {:noreply, state}
     else
       case check_rate_limit(state.rate_limiter) do
         {:ok, new_limiter} ->
           spawn(fn -> handle_request(socket, self(), state.basic_auth) end)
-          {:noreply, %{state |
-            active_connections: state.active_connections + 1,
-            rate_limiter: new_limiter
-          }}
+
+          {:noreply,
+           %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
 
         {:rate_limited, new_limiter} ->
           Logger.warning("Prometheus rate limit exceeded")
@@ -169,25 +176,19 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
   @impl true
   def handle_info({:connection_closed}, state) do
-    {:noreply, %{state |
-      active_connections: max(0, state.active_connections - 1)
-    }}
+    {:noreply, %{state | active_connections: max(0, state.active_connections - 1)}}
   end
 
   @impl true
   def handle_info({:scrape_complete, :ok}, state) do
-    {:noreply, %{state |
-      scrape_count: state.scrape_count + 1,
-      last_scrape_time: DateTime.utc_now()
-    }}
+    {:noreply,
+     %{state | scrape_count: state.scrape_count + 1, last_scrape_time: DateTime.utc_now()}}
   end
 
   @impl true
   def handle_info({:scrape_complete, :error}, state) do
-    {:noreply, %{state |
-      error_count: state.error_count + 1,
-      last_scrape_time: DateTime.utc_now()
-    }}
+    {:noreply,
+     %{state | error_count: state.error_count + 1, last_scrape_time: DateTime.utc_now()}}
   end
 
   @impl true
@@ -201,6 +202,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
     if state[:listen_socket] do
       :gen_tcp.close(state.listen_socket)
     end
+
     :ok
   end
 
@@ -272,7 +274,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
       {:ok, :http_eoh} ->
         headers
 
-      {:ok, {:http_header, _, 'Authorization', _, value}} ->
+      {:ok, {:http_header, _, ~c"Authorization", _, value}} ->
         collect_headers(socket, Map.put(headers, :authorization, to_string(value)))
 
       {:ok, {:http_header, _, :Authorization, _, value}} ->
@@ -316,6 +318,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
   defp send_404_response(socket) do
     body = "Not Found"
+
     response = [
       "HTTP/1.1 404 Not Found\r\n",
       "Content-Type: text/plain\r\n",
@@ -323,11 +326,13 @@ defmodule ObservLib.Metrics.PrometheusReader do
       "\r\n",
       body
     ]
+
     :gen_tcp.send(socket, response)
   end
 
   defp send_405_response(socket) do
     body = "Method Not Allowed"
+
     response = [
       "HTTP/1.1 405 Method Not Allowed\r\n",
       "Content-Type: text/plain\r\n",
@@ -335,11 +340,13 @@ defmodule ObservLib.Metrics.PrometheusReader do
       "\r\n",
       body
     ]
+
     :gen_tcp.send(socket, response)
   end
 
   defp send_unauthorized_response(socket) do
     body = "Unauthorized"
+
     response = [
       "HTTP/1.1 401 Unauthorized\r\n",
       "WWW-Authenticate: Basic realm=\"Prometheus Metrics\"\r\n",
@@ -348,11 +355,13 @@ defmodule ObservLib.Metrics.PrometheusReader do
       "\r\n",
       body
     ]
+
     :gen_tcp.send(socket, response)
   end
 
   defp send_rate_limit_response(socket) do
     body = "Too Many Requests"
+
     response = [
       "HTTP/1.1 429 Too Many Requests\r\n",
       "Content-Type: text/plain\r\n",
@@ -360,6 +369,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
       "\r\n",
       body
     ]
+
     :gen_tcp.send(socket, response)
   end
 
@@ -381,9 +391,10 @@ defmodule ObservLib.Metrics.PrometheusReader do
     tokens_to_add = div(elapsed * limiter.max_tokens, 60_000)
     new_tokens = min(limiter.tokens + tokens_to_add, limiter.max_tokens)
 
-    new_limiter = %{limiter |
-      tokens: new_tokens,
-      last_refill: if(tokens_to_add > 0, do: now, else: limiter.last_refill)
+    new_limiter = %{
+      limiter
+      | tokens: new_tokens,
+        last_refill: if(tokens_to_add > 0, do: now, else: limiter.last_refill)
     }
 
     if new_limiter.tokens > 0 do
@@ -437,9 +448,10 @@ defmodule ObservLib.Metrics.PrometheusReader do
       "# TYPE #{prom_name} #{prom_type}"
     ]
 
-    metric_lines = Enum.flat_map(data_points, fn dp ->
-      format_data_point(prom_name, dp)
-    end)
+    metric_lines =
+      Enum.flat_map(data_points, fn dp ->
+        format_data_point(prom_name, dp)
+      end)
 
     Enum.join(lines ++ metric_lines, "\n")
   end
@@ -460,15 +472,22 @@ defmodule ObservLib.Metrics.PrometheusReader do
     labels = format_labels(attrs)
     base_labels = if labels == "", do: "", else: String.slice(labels, 1..-2//1)
 
-    bucket_lines = Enum.map(data.buckets, fn
-      {:infinity, count} ->
-        le_labels = if base_labels == "", do: "{le=\"+Inf\"}", else: "{#{base_labels},le=\"+Inf\"}"
-        "#{name}_bucket#{le_labels} #{count}"
+    bucket_lines =
+      Enum.map(data.buckets, fn
+        {:infinity, count} ->
+          le_labels =
+            if base_labels == "", do: "{le=\"+Inf\"}", else: "{#{base_labels},le=\"+Inf\"}"
 
-      {boundary, count} ->
-        le_labels = if base_labels == "", do: "{le=\"#{boundary}\"}", else: "{#{base_labels},le=\"#{boundary}\"}"
-        "#{name}_bucket#{le_labels} #{count}"
-    end)
+          "#{name}_bucket#{le_labels} #{count}"
+
+        {boundary, count} ->
+          le_labels =
+            if base_labels == "",
+              do: "{le=\"#{boundary}\"}",
+              else: "{#{base_labels},le=\"#{boundary}\"}"
+
+          "#{name}_bucket#{le_labels} #{count}"
+      end)
 
     sum_line = "#{name}_sum#{labels} #{format_value(data.sum)}"
     count_line = "#{name}_count#{labels} #{data.count}"
@@ -487,13 +506,14 @@ defmodule ObservLib.Metrics.PrometheusReader do
   defp format_labels(attrs) when map_size(attrs) == 0, do: ""
 
   defp format_labels(attrs) do
-    label_pairs = attrs
-    |> Enum.map(fn {k, v} ->
-      key = sanitize_label_name(to_string(k))
-      value = escape_label_value(to_string(v))
-      "#{key}=\"#{value}\""
-    end)
-    |> Enum.join(",")
+    label_pairs =
+      attrs
+      |> Enum.map(fn {k, v} ->
+        key = sanitize_label_name(to_string(k))
+        value = escape_label_value(to_string(v))
+        "#{key}=\"#{value}\""
+      end)
+      |> Enum.join(",")
 
     "{#{label_pairs}}"
   end
@@ -519,12 +539,18 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
   defp escape_label_value(value) when is_binary(value) do
     value
-    |> String.replace("\\", "\\\\")     # Backslash first!
-    |> String.replace("\"", "\\\"")     # Double quote
-    |> String.replace("\n", "\\n")      # Newline
-    |> String.replace("\r", "\\r")      # Carriage return
-    |> String.replace("\t", "\\t")      # Tab
-    |> escape_control_chars()           # All other control chars
+    # Backslash first!
+    |> String.replace("\\", "\\\\")
+    # Double quote
+    |> String.replace("\"", "\\\"")
+    # Newline
+    |> String.replace("\n", "\\n")
+    # Carriage return
+    |> String.replace("\r", "\\r")
+    # Tab
+    |> String.replace("\t", "\\t")
+    # All other control chars
+    |> escape_control_chars()
   end
 
   defp escape_label_value(value), do: escape_label_value(to_string(value))
@@ -536,12 +562,17 @@ defmodule ObservLib.Metrics.PrometheusReader do
       char when char < 32 or char == 127 ->
         # Escape control characters as \xHH (except already-escaped \n, \r, \t)
         case char do
-          10 -> "\\n"  # \n (already handled)
-          13 -> "\\r"  # \r (already handled)
-          9 -> "\\t"   # \t (already handled)
-          0 -> "\\x00" # Null byte
+          # \n (already handled)
+          10 -> "\\n"
+          # \r (already handled)
+          13 -> "\\r"
+          # \t (already handled)
+          9 -> "\\t"
+          # Null byte
+          0 -> "\\x00"
           _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16), 2, "0")
         end
+
       char ->
         <<char::utf8>>
     end)
@@ -551,6 +582,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
   defp type_to_prometheus(:counter), do: "counter"
   defp type_to_prometheus(:gauge), do: "gauge"
   defp type_to_prometheus(:histogram), do: "histogram"
-  defp type_to_prometheus(:up_down_counter), do: "gauge"  # Prometheus doesn't have up_down_counter
+  # Prometheus doesn't have up_down_counter
+  defp type_to_prometheus(:up_down_counter), do: "gauge"
   defp type_to_prometheus(_), do: "untyped"
 end

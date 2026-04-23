@@ -104,6 +104,7 @@ defmodule ObservLib.Traced do
     if traced_opts != nil do
       # Store the function info for later rewriting
       arity = length(args)
+
       func_info = %{
         kind: kind,
         name: name,
@@ -143,7 +144,7 @@ defmodule ObservLib.Traced do
       end
 
     quote do
-      unquote_splicing(overrides)
+      (unquote_splicing(overrides))
     end
   end
 

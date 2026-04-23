@@ -59,7 +59,7 @@ defmodule ObservLib.MixProject do
       before_closing_body_tag: &before_closing_body_tag/1,
       assets: "docs/assets",
       formatters: ["html"],
-      source_ref: "v#{@version}",
+      source_ref: "v0.1.0",
       api_reference: true
     ]
   end
@@ -71,13 +71,13 @@ defmodule ObservLib.MixProject do
       "guides/configuration.md",
       "guides/custom-instrumentation.md",
       "CHANGELOG.md": [title: "Changelog"],
-      "LICENSE": [title: "License"]
+      LICENSE: [title: "License"]
     ]
   end
 
   defp groups_for_extras do
     [
-      "Guides": ~r/guides\/.*/
+      Guides: ~r/guides\/.*/
     ]
   end
 
@@ -88,30 +88,30 @@ defmodule ObservLib.MixProject do
         ObservLib.Application,
         ObservLib.Config
       ],
-      "Traces": [
+      Traces: [
         ObservLib.Traces,
         ObservLib.Traces.Provider,
         ObservLib.Traces.Supervisor,
         ObservLib.Traces.PyroscopeProcessor,
         ObservLib.Traced
       ],
-      "Metrics": [
+      Metrics: [
         ObservLib.Metrics,
         ObservLib.Metrics.MeterProvider,
         ObservLib.Metrics.Supervisor,
         ObservLib.Metrics.PrometheusReader,
         ObservLib.Metrics.OtlpMetricsExporter
       ],
-      "Logs": [
+      Logs: [
         ObservLib.Logs,
         ObservLib.Logs.Backend,
         ObservLib.Logs.Supervisor,
         ObservLib.Logs.OtlpLogsExporter
       ],
-      "Telemetry": [
+      Telemetry: [
         ObservLib.Telemetry
       ],
-      "Pyroscope": [
+      Pyroscope: [
         ObservLib.Pyroscope.Client
       ]
     ]
