@@ -89,7 +89,7 @@ ObservLib follows a defense-in-depth approach:
 1. **Input Validation**: All external inputs validated at boundaries
 2. **Resource Limits**: Multiple configurable limits prevent exhaustion
 3. **Secure Defaults**: TLS verification, rate limiting, and redaction enabled by default
-4. **Fail-Safe**: Security failures logged but don't crash the application
+4. **Fail-Silent**: Security failures do not crash the application. Note: if the OTLP log exporter is unavailable, `ObservLib.Logs.Backend` silently drops log records rather than crashing. This prevents cascading failures but means log loss is not automatically signalled to operators. Monitor for dropped logs using the `:observlib, :logs, :drop` telemetry event (see NEW-007 tracking issue for full observability improvements).
 5. **Least Privilege**: Processes operate with minimal required permissions
 
 ## Configuration for Security

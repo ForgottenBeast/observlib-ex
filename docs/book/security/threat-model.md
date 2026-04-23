@@ -476,11 +476,13 @@ end
 :ets.new(:observlib_metrics, [
   :set,
   :named_table,
-  :public,              # Anyone can read
+  :protected,           # Only owner process can write; other processes can read
   {:read_concurrency, true},
   {:write_concurrency, false}
 ])
-# Default :protected means only owner can write
+# :protected restricts writes to the owning process (MeterProvider GenServer).
+# External processes retain read access for scraping metrics.
+# Using :public would allow any process to corrupt metric data — do not use :public.
 ```
 
 **Test Coverage**: `test/security/access_control_test.exs`
