@@ -179,7 +179,9 @@ defmodule ObservLib.Security.InjectionPreventionTest do
             0 -> "\\x00"
             _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16), 2, "0")
           end
-        char -> <<char::utf8>>
+
+        char ->
+          <<char::utf8>>
       end)
       |> Enum.join()
     end

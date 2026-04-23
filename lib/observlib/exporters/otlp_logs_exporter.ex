@@ -150,7 +150,7 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
 
   @impl true
   def init(opts) do
-    endpoint = get_config(:otlp_endpoint, @default_endpoint)
+    endpoint = Keyword.get(opts, :endpoint) || get_config(:otlp_endpoint, @default_endpoint)
     batch_size = Keyword.get(opts, :batch_size, get_config(:logs_batch_size, @default_batch_size))
 
     batch_timeout =
@@ -180,6 +180,9 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
     case do_export(log_records, state) do
       :ok ->
         {:reply, :ok, state}
+
+      {:retry, _retry_count} ->
+        {:reply, {:error, :connection_failed}, state}
 
       {:error, reason} = error ->
         safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
@@ -294,7 +297,7 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
       {"accept", "application/json"}
     ]
 
-    case ObservLib.HTTP.post(url, payload, headers) do
+    case ObservLib.HTTP.post(url, json: payload, headers: headers) do
       {:ok, %{status: status}} when status in 200..299 ->
         :ok
 

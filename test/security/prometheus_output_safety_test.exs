@@ -192,7 +192,7 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
     # (e.g., by filtering/replacing non-UTF-8 bytes before escaping).
 
     property "no raw CR/LF/null bytes appear in escaped label output" do
-      check all raw_value <- StreamData.string(:printable, length: 0..64) do
+      check all(raw_value <- StreamData.string(:printable, length: 0..64)) do
         escaped = escape_label_value(raw_value)
 
         refute String.contains?(escaped, <<0>>),
@@ -207,8 +207,10 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
     end
 
     property "format_labels output always has balanced outer structure" do
-      check all raw_value <- StreamData.string(:printable, length: 0..32),
-                max_runs: 200 do
+      check all(
+              raw_value <- StreamData.string(:printable, length: 0..32),
+              max_runs: 200
+            ) do
         formatted = format_labels(%{k: raw_value})
 
         if formatted != "" do
@@ -221,7 +223,12 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
           # The formatted string must have an even number of unescaped quotes
           # (every value is surrounded by a pair of quotes)
           stripped = String.slice(formatted, 1..-2//1)
-          unescaped_quotes = stripped |> String.replace(~r/\\./, "") |> String.graphemes() |> Enum.count(&(&1 == "\""))
+
+          unescaped_quotes =
+            stripped
+            |> String.replace(~r/\\./, "")
+            |> String.graphemes()
+            |> Enum.count(&(&1 == "\""))
 
           assert rem(unescaped_quotes, 2) == 0,
                  "Unbalanced quotes in label string for input #{inspect(raw_value)}: #{inspect(formatted)}"

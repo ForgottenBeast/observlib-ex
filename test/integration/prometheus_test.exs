@@ -21,6 +21,9 @@ defmodule ObservLib.Integration.PrometheusTest do
     Application.put_env(:observlib, :service_name, "prometheus-test-service")
     Application.put_env(:observlib, :prometheus_port, port)
 
+    # Config and MeterProvider are already started by the Application; reset for isolation
+    ObservLib.Metrics.MeterProvider.reset()
+
     on_exit(fn ->
       # Restore original config
       for {key, _} <- Application.get_all_env(:observlib) do
@@ -37,8 +40,6 @@ defmodule ObservLib.Integration.PrometheusTest do
 
   describe "prometheus scrape endpoint" do
     test "responds with 200 OK to GET /metrics", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Allow time for TCP listener to start
@@ -56,8 +57,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "returns 404 for non-metrics paths", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       Process.sleep(50)
@@ -72,8 +71,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "returns 405 for non-GET methods", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       Process.sleep(50)
@@ -95,8 +92,6 @@ defmodule ObservLib.Integration.PrometheusTest do
 
   describe "prometheus text format" do
     test "counter metrics are formatted correctly", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record counter metrics
@@ -113,8 +108,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "gauge metrics are formatted correctly", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record gauge metric
@@ -128,8 +121,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "histogram metrics are formatted correctly", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record histogram observations
@@ -150,8 +141,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "up_down_counter is formatted as gauge", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record up-down counter
@@ -166,8 +155,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "metric names are sanitized", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record metric with special characters in name
@@ -182,8 +169,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "label values are escaped", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record metric with special characters in label value
@@ -197,8 +182,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "empty metrics returns empty response", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       Process.sleep(50)
@@ -210,8 +193,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "metrics with no labels work correctly", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       ObservLib.Metrics.counter("simple_counter", 5, %{})
@@ -227,8 +208,6 @@ defmodule ObservLib.Integration.PrometheusTest do
 
   describe "metric values" do
     test "counter values match recorded amounts", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record multiple increments
@@ -244,8 +223,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "histogram statistics are accurate", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record specific values
@@ -263,8 +240,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "different label combinations create separate series", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       ObservLib.Metrics.counter("api_calls", 5, %{method: "GET"})
@@ -281,8 +256,6 @@ defmodule ObservLib.Integration.PrometheusTest do
 
   describe "reader statistics" do
     test "tracks scrape count", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       Process.sleep(50)
@@ -303,8 +276,6 @@ defmodule ObservLib.Integration.PrometheusTest do
     end
 
     test "reports correct port", %{port: port} do
-      {:ok, _config} = start_supervised({ObservLib.Config, []})
-      {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       Process.sleep(50)

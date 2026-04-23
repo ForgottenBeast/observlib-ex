@@ -337,6 +337,7 @@ defmodule ObservLib.MetricsTest do
 
         # Compare against sanitized attrs since attribute values may be redacted
         {:ok, safe_attrs} = ObservLib.Attributes.validate(attrs)
+
         Enum.each(safe_attrs, fn {key, val} ->
           assert Map.get(metadata, key) == val
         end)

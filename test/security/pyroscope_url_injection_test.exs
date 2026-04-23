@@ -113,6 +113,7 @@ defmodule ObservLib.Security.PyroscopeUrlInjectionTest do
       # No injection: evil is not a separate query param
       parsed = URI.parse(url)
       query_params = URI.decode_query(parsed.query)
+
       refute Map.has_key?(query_params, "evil"),
              "'evil' must not appear as a separate query param; url: #{url}"
     end
@@ -170,8 +171,10 @@ defmodule ObservLib.Security.PyroscopeUrlInjectionTest do
     end
 
     property "secure encoding: arbitrary label keys never produce unencoded & or # in query" do
-      check all label_key <- StreamData.string(:printable, length: 1..32),
-                label_value <- StreamData.string(:printable, length: 1..16) do
+      check all(
+              label_key <- StreamData.string(:printable, length: 1..32),
+              label_value <- StreamData.string(:printable, length: 1..16)
+            ) do
         url = build_url_secure("http://localhost:4040", "app", %{label_key => label_value})
         parsed = URI.parse(url)
 

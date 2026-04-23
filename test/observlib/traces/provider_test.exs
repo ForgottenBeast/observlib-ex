@@ -18,6 +18,7 @@ defmodule ObservLib.Traces.ProviderTest do
       if Process.alive?(pid) do
         GenServer.stop(pid, :normal, 1000)
       end
+
       # Restore supervised Provider
       Supervisor.restart_child(ObservLib.Traces.Supervisor, ObservLib.Traces.Provider)
     end)
