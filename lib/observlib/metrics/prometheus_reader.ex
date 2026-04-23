@@ -101,19 +101,8 @@ defmodule ObservLib.Metrics.PrometheusReader do
            reuseaddr: true
          ]) do
       {:ok, listen_socket} ->
-        config = %{
-          basic_auth: basic_auth,
-          max_connections: max_connections,
-          rate_limit: rate_limit
-        }
-
         # Start accepting connections in a separate process
-        parent = self()
-
-        acceptor_pid =
-          spawn_link(fn ->
-            accept_loop(listen_socket, parent, config, 0, init_rate_limiter(rate_limit))
-          end)
+        acceptor_pid = spawn_link(fn -> accept_loop(listen_socket, self()) end)
 
         state = %{
           port: port,
@@ -160,6 +149,32 @@ defmodule ObservLib.Metrics.PrometheusReader do
   end
 
   @impl true
+  def handle_info({:new_connection, socket}, state) do
+    if state.active_connections >= state.max_connections do
+      Logger.warning(
+        "Prometheus connection limit exceeded (#{state.active_connections}/#{state.max_connections})"
+      )
+
+      :gen_tcp.close(socket)
+      {:noreply, state}
+    else
+      case check_rate_limit(state.rate_limiter) do
+        {:ok, new_limiter} ->
+          spawn(fn -> handle_request(socket, self(), state.basic_auth) end)
+
+          {:noreply,
+           %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
+
+        {:rate_limited, new_limiter} ->
+          Logger.warning("Prometheus rate limit exceeded")
+          send_rate_limit_response(socket)
+          :gen_tcp.close(socket)
+          {:noreply, %{state | rate_limiter: new_limiter}}
+      end
+    end
+  end
+
+  @impl true
   def handle_info({:connection_closed}, state) do
     {:noreply, %{state | active_connections: max(0, state.active_connections - 1)}}
   end
@@ -193,46 +208,12 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
   # Private Functions - Accept Loop
 
-  defp accept_loop(listen_socket, parent, config, active_connections, rate_limiter) do
+  defp accept_loop(listen_socket, parent) do
     case :gen_tcp.accept(listen_socket) do
       {:ok, client_socket} ->
-        if active_connections >= config.max_connections do
-          Logger.warning(
-            "Prometheus connection limit exceeded (#{active_connections}/#{config.max_connections})"
-          )
-
-          :gen_tcp.close(client_socket)
-          accept_loop(listen_socket, parent, config, active_connections, rate_limiter)
-        else
-          case check_rate_limit(rate_limiter) do
-            {:ok, new_limiter} ->
-              basic_auth = config.basic_auth
-
-              handler_pid =
-                spawn(fn ->
-                  receive do
-                    :go -> handle_request(client_socket, parent, basic_auth)
-                  end
-                end)
-
-              :gen_tcp.controlling_process(client_socket, handler_pid)
-              send(handler_pid, :go)
-
-              accept_loop(
-                listen_socket,
-                parent,
-                config,
-                active_connections + 1,
-                new_limiter
-              )
-
-            {:rate_limited, new_limiter} ->
-              Logger.warning("Prometheus rate limit exceeded")
-              send_rate_limit_response(client_socket)
-              :gen_tcp.close(client_socket)
-              accept_loop(listen_socket, parent, config, active_connections, new_limiter)
-          end
-        end
+        # Send new connection to GenServer for rate limiting and auth
+        send(parent, {:new_connection, client_socket})
+        accept_loop(listen_socket, parent)
 
       {:error, :closed} ->
         # Socket closed, exit normally
@@ -240,7 +221,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
 
       {:error, reason} ->
         Logger.warning("Accept error: #{inspect(reason)}")
-        accept_loop(listen_socket, parent, config, active_connections, rate_limiter)
+        accept_loop(listen_socket, parent)
     end
   end
 
