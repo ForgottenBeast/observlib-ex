@@ -133,7 +133,7 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
   @spec force_flush() :: :ok | {:error, term()}
   def force_flush do
     try do
-      :otel_batch_processor.force_flush()
+      :otel_batch_processor.force_flush(%{reg_name: :otel_batch_processor_global})
       :ok
     catch
       kind, reason ->
@@ -189,7 +189,8 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
 
   defp get_endpoint do
     # Check for specific traces endpoint first (includes fallback to otlp_endpoint in Config)
-    case Application.get_env(:observlib, :otlp_traces_endpoint) || Application.get_env(:observlib, :otlp_endpoint) do
+    case Application.get_env(:observlib, :otlp_traces_endpoint) ||
+           Application.get_env(:observlib, :otlp_endpoint) do
       nil ->
         @default_endpoint
 
