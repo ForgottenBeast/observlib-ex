@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  MIX_ENV: test
+  ELIXIR_VERSION: "1.16.3"
+  OTP_VERSION: "26.2.5"
+
+jobs:
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - run: mix format --check-formatted
+
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-deps-
+      - uses: actions/cache@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-test-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-build-test-
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+
+  test-unit:
+    name: Unit tests
+    needs: [compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-test-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix test
+
+  test-integration:
+    name: Integration tests
+    needs: [compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-test-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix test --only integration
+
+  test-security:
+    name: Security tests
+    needs: [compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-test-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix test --only security
+
+  credo:
+    name: Credo (strict)
+    needs: [compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-test-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix credo --strict
+
+  dialyzer:
+    name: Dialyzer
+    needs: [compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('mix.lock') }}
+      - uses: actions/cache@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-plt-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-plt-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-
+      - run: mix deps.get
+      - run: mix dialyzer
+
+  nix-smoke:
+    name: Nix smoke test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix develop -c mix deps.get
+      - run: nix develop -c mix test

@@ -1,4 +1,4 @@
-.PHONY: help docs docs-hex docs-book docs-serve clean test
+.PHONY: help docs docs-hex docs-book docs-serve clean test test-unit test-integration test-security fmt-check compile-check credo dialyzer test-all ci
 
 help: ## Show this help message
 	@echo "Available targets:"
@@ -30,10 +30,33 @@ clean: ## Clean generated documentation
 	@rm -rf doc/
 	@echo "✓ Documentation cleaned"
 
-test: ## Run tests
+test: test-unit  ## Run unit tests (alias for backward compat)
+
+test-all: ## Run ALL tests (unit + integration + security) in one ExUnit run
+	@mix test --include integration --include security
+
+fmt-check: ## Check code formatting
+	@mix format --check-formatted
+
+compile-check: ## Compile with warnings-as-errors
+	@mix compile --warnings-as-errors
+
+test-unit: ## Run unit tests only (excludes integration + security)
 	@mix test
 
-test-all: test docs ## Run tests and build documentation
-	@echo "✓ All checks passed"
+test-integration: ## Run integration tests only
+	@mix test --only integration
+
+test-security: ## Run security tests only (test/security/ + inline @tag :security)
+	@mix test --only security
+
+credo: ## Run Credo static analysis (strict mode)
+	@mix credo --strict
+
+dialyzer: ## Run Dialyzer type checking
+	@mix dialyzer
+
+ci: ## Run full CI suite locally (sequential, fail-fast)
+	$(MAKE) fmt-check compile-check test-unit test-integration test-security credo dialyzer
 
 .DEFAULT_GOAL := help
