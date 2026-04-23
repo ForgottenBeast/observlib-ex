@@ -209,6 +209,7 @@ defmodule ObservLib.Metrics.MeterProviderTest do
   describe "concurrent writes" do
     test "handles concurrent writes from multiple processes" do
       name = "test.metric.#{:erlang.unique_integer([:positive])}"
+
       tasks =
         for i <- 1..100 do
           Task.async(fn ->

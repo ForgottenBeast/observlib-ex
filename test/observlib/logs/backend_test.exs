@@ -3,6 +3,8 @@ defmodule ObservLib.Logs.BackendTest do
 
   import ExUnit.CaptureLog
 
+  require Logger
+
   alias ObservLib.Logs.Backend
 
   describe "start_link/1" do
