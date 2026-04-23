@@ -125,20 +125,34 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
   @impl true
   def handle_call(:force_export, _from, state) do
     result = do_export(state)
-    new_state = update_export_stats(state, result)
-    {:reply, result, new_state}
+    # Normalize {:retry, _} to {:error, :retry} for stats tracking
+    normalized_result =
+      case result do
+        {:retry, _} -> {:error, :retry}
+        other -> other
+      end
+    new_state = update_export_stats(state, normalized_result)
+    reply_result =
+      case result do
+        {:retry, _} -> {:error, :connection_failed}
+        other -> other
+      end
+    {:reply, reply_result, new_state}
   end
 
   @impl true
   def handle_call(:get_stats, _from, state) do
-    # Get metric count from MeterProvider if available, fall back to internal state
-    metric_count = try do
-      length(ObservLib.Metrics.MeterProvider.read_all())
-    rescue
-      _ -> map_size(Map.get(state, :metrics, %{}))
-    catch
-      :exit, _ -> map_size(Map.get(state, :metrics, %{}))
-    end
+    # Get metric count from both MeterProvider and internal state
+    metric_count =
+      try do
+        provider_count = length(ObservLib.Metrics.MeterProvider.read_all())
+        internal_count = map_size(Map.get(state, :metrics, %{}))
+        provider_count + internal_count
+      rescue
+        _ -> map_size(Map.get(state, :metrics, %{}))
+      catch
+        :exit, _ -> map_size(Map.get(state, :metrics, %{}))
+      end
 
     stats = %{
       enabled: state.enabled,
@@ -161,19 +175,21 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     # Perform export
     result = do_export(state)
 
-    new_state = case result do
-      :ok ->
-        update_export_stats(state, :ok)
+    new_state =
+      case result do
+        :ok ->
+          update_export_stats(state, :ok)
 
-      {:retry, new_retry_count} ->
-        # Schedule retry with exponential backoff
-        retry_delay = calculate_retry_delay(new_retry_count)
-        Process.send_after(self(), :retry_export, retry_delay)
-        %{state | retry_count: new_retry_count}
+        {:retry, new_retry_count} ->
+          # Schedule retry with exponential backoff
+          retry_delay = calculate_retry_delay(new_retry_count)
+          Process.send_after(self(), :retry_export, retry_delay)
+          updated = update_export_stats(state, {:error, :retry_scheduled})
+          %{updated | retry_count: new_retry_count}
 
-      {:error, _reason} = error ->
-        update_export_stats(state, error)
-    end
+        {:error, _reason} = error ->
+          update_export_stats(state, error)
+      end
 
     # Schedule next export
     timer_ref = Process.send_after(self(), :export, state.export_interval)
@@ -187,19 +203,20 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     # Retry export
     result = do_export(state)
 
-    new_state = case result do
-      :ok ->
-        update_export_stats(%{state | retry_count: 0}, :ok)
+    new_state =
+      case result do
+        :ok ->
+          update_export_stats(%{state | retry_count: 0}, :ok)
 
-      {:retry, new_retry_count} ->
-        # Schedule another retry with exponential backoff
-        retry_delay = calculate_retry_delay(new_retry_count)
-        Process.send_after(self(), :retry_export, retry_delay)
-        %{state | retry_count: new_retry_count}
+        {:retry, new_retry_count} ->
+          # Schedule another retry with exponential backoff
+          retry_delay = calculate_retry_delay(new_retry_count)
+          Process.send_after(self(), :retry_export, retry_delay)
+          %{state | retry_count: new_retry_count}
 
-      {:error, _reason} = error ->
-        update_export_stats(%{state | retry_count: 0}, error)
-    end
+        {:error, _reason} = error ->
+          update_export_stats(%{state | retry_count: 0}, error)
+      end
 
     {:noreply, new_state}
   end
@@ -211,9 +228,14 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     metric_type = Map.get(metadata, :metric_type, :counter)
 
     updated_metrics =
-      Map.update(state.metrics, metric_key, build_initial_metric(metric_type, measurements, metadata), fn existing ->
-        aggregate_metric(existing, metric_type, measurements, metadata)
-      end)
+      Map.update(
+        state.metrics,
+        metric_key,
+        build_initial_metric(metric_type, measurements, metadata),
+        fn existing ->
+          aggregate_metric(existing, metric_type, measurements, metadata)
+        end
+      )
 
     {:noreply, %{state | metrics: updated_metrics}}
   end
@@ -232,13 +254,14 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
 
   defp do_export(%{endpoint: endpoint} = state) do
     # Read metrics from MeterProvider (primary source)
-    metrics_from_provider = try do
-      ObservLib.Metrics.MeterProvider.read_all()
-    rescue
-      _ -> []
-    catch
-      :exit, _ -> []
-    end
+    metrics_from_provider =
+      try do
+        ObservLib.Metrics.MeterProvider.read_all()
+      rescue
+        _ -> []
+      catch
+        :exit, _ -> []
+      end
 
     # Also check internal metrics for backward compatibility with tests
     internal_metrics = Map.get(state, :metrics, %{})
@@ -280,8 +303,9 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         :ok
 
       {:error, reason} ->
-        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
-        Logger.warning("Metrics export failed: #{inspect(safe_reason)}, retries left: #{retries_left - 1}")
+        Logger.warning(
+          "Metrics export failed: #{inspect(reason)}, retries left: #{retries_left - 1}"
+        )
 
         if retries_left > 1 do
           {:retry, retries_left - 1}
@@ -319,8 +343,7 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     }
 
     # Send HTTP POST request with TLS validation
-    headers = [{"content-type", "application/json"}]
-    case ObservLib.HTTP.post(url, body, headers) do
+    case ObservLib.HTTP.post(url, json: body) do
       {:ok, %Req.Response{status: status}} when status in 200..299 ->
         Logger.debug("Metrics exported successfully")
         :ok
@@ -331,8 +354,7 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         {:error, {:http_error, status}}
 
       {:error, reason} ->
-        safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
-        Logger.error("Metrics export request failed: #{inspect(safe_reason)}")
+        Logger.error("Metrics export request failed: #{inspect(reason)}")
         {:error, reason}
     end
   end
@@ -422,13 +444,14 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         %{
           "name" => name,
           "sum" => %{
-            "dataPoints" => Enum.map(data_points, fn dp ->
-              %{
-                "asInt" => trunc(dp.data.value),
-                "timeUnixNano" => to_string(dp.data.timestamp),
-                "attributes" => map_to_attributes(dp.attributes)
-              }
-            end),
+            "dataPoints" =>
+              Enum.map(data_points, fn dp ->
+                %{
+                  "asInt" => trunc(dp.data.value),
+                  "timeUnixNano" => to_string(dp.data.timestamp),
+                  "attributes" => map_to_attributes(dp.attributes)
+                }
+              end),
             "aggregationTemporality" => 2,
             "isMonotonic" => true
           }
@@ -438,13 +461,14 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         %{
           "name" => name,
           "gauge" => %{
-            "dataPoints" => Enum.map(data_points, fn dp ->
-              %{
-                "asDouble" => dp.data.value,
-                "timeUnixNano" => to_string(dp.data.timestamp),
-                "attributes" => map_to_attributes(dp.attributes)
-              }
-            end)
+            "dataPoints" =>
+              Enum.map(data_points, fn dp ->
+                %{
+                  "asDouble" => dp.data.value,
+                  "timeUnixNano" => to_string(dp.data.timestamp),
+                  "attributes" => map_to_attributes(dp.attributes)
+                }
+              end)
           }
         }
 
@@ -452,20 +476,21 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         %{
           "name" => name,
           "histogram" => %{
-            "dataPoints" => Enum.map(data_points, fn dp ->
-              buckets = dp.data.buckets || []
-              bounds = Enum.map(buckets, fn {b, _} -> b end) |> Enum.reject(&(&1 == :infinity))
-              counts = Enum.map(buckets, fn {_, c} -> to_string(c) end)
+            "dataPoints" =>
+              Enum.map(data_points, fn dp ->
+                buckets = dp.data.buckets || []
+                bounds = Enum.map(buckets, fn {b, _} -> b end) |> Enum.reject(&(&1 == :infinity))
+                counts = Enum.map(buckets, fn {_, c} -> to_string(c) end)
 
-              %{
-                "count" => to_string(dp.data.count),
-                "sum" => dp.data.sum,
-                "timeUnixNano" => to_string(dp.data.timestamp),
-                "attributes" => map_to_attributes(dp.attributes),
-                "bucketCounts" => counts,
-                "explicitBounds" => bounds
-              }
-            end),
+                %{
+                  "count" => to_string(dp.data.count),
+                  "sum" => dp.data.sum,
+                  "timeUnixNano" => to_string(dp.data.timestamp),
+                  "attributes" => map_to_attributes(dp.attributes),
+                  "bucketCounts" => counts,
+                  "explicitBounds" => bounds
+                }
+              end),
             "aggregationTemporality" => 2
           }
         }
@@ -474,13 +499,14 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
         %{
           "name" => name,
           "sum" => %{
-            "dataPoints" => Enum.map(data_points, fn dp ->
-              %{
-                "asInt" => trunc(dp.data.value),
-                "timeUnixNano" => to_string(dp.data.timestamp),
-                "attributes" => map_to_attributes(dp.attributes)
-              }
-            end),
+            "dataPoints" =>
+              Enum.map(data_points, fn dp ->
+                %{
+                  "asInt" => trunc(dp.data.value),
+                  "timeUnixNano" => to_string(dp.data.timestamp),
+                  "attributes" => map_to_attributes(dp.attributes)
+                }
+              end),
             "aggregationTemporality" => 2,
             "isMonotonic" => false
           }
