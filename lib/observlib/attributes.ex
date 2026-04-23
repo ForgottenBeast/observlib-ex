@@ -56,17 +56,15 @@ defmodule ObservLib.Attributes do
     end
   end
 
-  def validate(attributes), do: {:ok, %{}}
+  def validate(_attributes), do: {:ok, %{}}
 
-  @doc """
-  Redacts sensitive attributes based on configured key patterns.
-
-  Checks attribute keys against the redacted_attribute_keys list and replaces
-  matching values with the redaction pattern (default: "[REDACTED]").
-  """
   @spec redact_sensitive(map()) :: map()
   defp redact_sensitive(attributes) when is_map(attributes) do
-    redacted_keys = ObservLib.Config.get(:redacted_attribute_keys, default_redacted_keys())
+    # nil means "use the default list" (config.exs sets the key to nil by default)
+    redacted_keys =
+      ObservLib.Config.get(:redacted_attribute_keys, default_redacted_keys()) ||
+        default_redacted_keys()
+
     redaction_pattern = ObservLib.Config.get(:redaction_pattern, "[REDACTED]")
 
     Map.new(attributes, fn {k, v} ->
@@ -78,11 +76,6 @@ defmodule ObservLib.Attributes do
     end)
   end
 
-  @doc """
-  Checks if an attribute key should be redacted.
-
-  Performs case-insensitive substring matching against the redacted keys list.
-  """
   @spec should_redact?(String.t(), list(String.t())) :: boolean()
   defp should_redact?(key, redacted_keys) when is_binary(key) do
     key_lower = String.downcase(key)
@@ -95,9 +88,6 @@ defmodule ObservLib.Attributes do
 
   defp should_redact?(_key, _redacted_keys), do: false
 
-  @doc """
-  Default list of sensitive attribute key patterns to redact.
-  """
   @spec default_redacted_keys() :: list(String.t())
   defp default_redacted_keys do
     [
@@ -122,9 +112,6 @@ defmodule ObservLib.Attributes do
     ]
   end
 
-  @doc """
-  Truncates all values in the attributes map to the maximum size.
-  """
   @spec truncate_values(map(), non_neg_integer()) :: map()
   defp truncate_values(attributes, max_size) do
     Map.new(attributes, fn {k, v} ->
@@ -132,12 +119,6 @@ defmodule ObservLib.Attributes do
     end)
   end
 
-  @doc """
-  Truncates a single value if it exceeds the maximum size.
-
-  Binary values are truncated with a "...[TRUNC]" suffix.
-  Non-binary values are passed through unchanged.
-  """
   @spec truncate_value(any(), non_neg_integer()) :: any()
   defp truncate_value(value, max_size) when is_binary(value) do
     if byte_size(value) > max_size do
