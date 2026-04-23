@@ -46,7 +46,9 @@ defmodule ObservLib.Integration.FullPipelineTest do
       # Start required services
       {:ok, config} = start_supervised({ObservLib.Config, []})
       {:ok, meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, logs_exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_timeout: 100]})
+
+      {:ok, logs_exporter} =
+        start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_timeout: 100]})
 
       # Create a span
       span_ctx = ObservLib.Traces.start_span("test-span", %{"test.attribute" => "value"})
@@ -61,9 +63,10 @@ defmodule ObservLib.Integration.FullPipelineTest do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
 
-      result = ObservLib.Traces.with_span("computation", %{"operation" => "add"}, fn ->
-        1 + 1
-      end)
+      result =
+        ObservLib.Traces.with_span("computation", %{"operation" => "add"}, fn ->
+          1 + 1
+        end)
 
       assert result == 2
     end
@@ -84,7 +87,9 @@ defmodule ObservLib.Integration.FullPipelineTest do
     test "emitting metrics results in OTLP export", %{server: server, endpoint: endpoint} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       # Record some metrics
       ObservLib.Metrics.counter("http.requests", 1, %{method: "GET", status: "200"})
@@ -131,7 +136,8 @@ defmodule ObservLib.Integration.FullPipelineTest do
 
       assert length(counter_metrics) == 1
       [counter] = counter_metrics
-      assert counter.data.value == 9  # 1 + 5 + 3
+      # 1 + 5 + 3
+      assert counter.data.value == 9
     end
 
     test "histogram tracks statistics correctly", %{server: server} do
@@ -174,7 +180,8 @@ defmodule ObservLib.Integration.FullPipelineTest do
 
       assert length(gauge_metrics) == 1
       [gauge] = gauge_metrics
-      assert gauge.data.value == 22.0  # Last value
+      # Last value
+      assert gauge.data.value == 22.0
     end
 
     test "up_down_counter allows negative values", %{server: server} do
@@ -194,7 +201,8 @@ defmodule ObservLib.Integration.FullPipelineTest do
 
       assert length(udc_metrics) == 1
       [udc] = udc_metrics
-      assert udc.data.value == 4  # 5 - 2 + 1
+      # 5 - 2 + 1
+      assert udc.data.value == 4
     end
   end
 
@@ -202,7 +210,11 @@ defmodule ObservLib.Integration.FullPipelineTest do
     test "emitting logs results in OTLP export", %{server: server, endpoint: endpoint} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _logs_exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]})
+
+      {:ok, _logs_exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]}
+        )
 
       # Emit a log
       ObservLib.Logs.info("Test log message", user_id: 123, action: "test")
@@ -234,10 +246,11 @@ defmodule ObservLib.Integration.FullPipelineTest do
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
 
       # Test with_context
-      result = ObservLib.Logs.with_context(%{request_id: "abc-123"}, fn ->
-        ObservLib.Logs.info("Processing request")
-        :ok
-      end)
+      result =
+        ObservLib.Logs.with_context(%{request_id: "abc-123"}, fn ->
+          ObservLib.Logs.info("Processing request")
+          :ok
+        end)
 
       assert result == :ok
     end
@@ -247,7 +260,11 @@ defmodule ObservLib.Integration.FullPipelineTest do
     test "trace context is available in logs within a span", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _logs_exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]})
+
+      {:ok, _logs_exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]}
+        )
 
       # Create a span and log within it
       ObservLib.Traces.with_span("parent-operation", %{}, fn ->
@@ -302,9 +319,10 @@ defmodule ObservLib.Integration.FullPipelineTest do
 
       import ObservLib.Traced
 
-      result = traced "inline-span", %{operation: "test"} do
-        1 + 2 + 3
-      end
+      result =
+        traced "inline-span", %{operation: "test"} do
+          1 + 2 + 3
+        end
 
       assert result == 6
     end
@@ -327,8 +345,14 @@ defmodule ObservLib.Integration.FullPipelineTest do
     test "all three signal types flow simultaneously", %{server: server, endpoint: endpoint} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _metrics_exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
-      {:ok, _logs_exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]})
+
+      {:ok, _metrics_exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _logs_exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 100]}
+        )
 
       # Emit all signal types
       ObservLib.Traces.with_span("multi-signal-operation", %{}, fn ->

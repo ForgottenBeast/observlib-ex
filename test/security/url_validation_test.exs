@@ -127,8 +127,10 @@ defmodule ObservLib.Security.UrlValidationTest do
         "file:///C:/Windows/win.ini",
 
         # Internal network scanning
-        "http://169.254.169.254/latest/meta-data/",  # AWS metadata
-        "http://metadata.google.internal/computeMetadata/v1/",  # GCP metadata
+        # AWS metadata
+        "http://169.254.169.254/latest/meta-data/",
+        # GCP metadata
+        "http://metadata.google.internal/computeMetadata/v1/",
 
         # Protocol smuggling
         "gopher://127.0.0.1:6379/_GET%20key",

@@ -5,11 +5,12 @@ defmodule ObservLib.Metrics.SupervisorTest do
   alias ObservLib.Metrics.MeterProvider
 
   setup do
-    # Start Config first (required by Supervisor)
-    start_supervised!(ObservLib.Config)
+    # Terminate the running Metrics.Supervisor to allow tests to start fresh instances
+    Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Metrics.Supervisor)
 
     on_exit(fn ->
-      :ok
+      # Restore the supervised Metrics.Supervisor
+      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Metrics.Supervisor)
     end)
 
     :ok

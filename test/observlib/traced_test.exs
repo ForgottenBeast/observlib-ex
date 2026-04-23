@@ -263,7 +263,8 @@ defmodule ObservLib.TracedTest do
   describe "mixed traced and untraced functions" do
     test "traced function can call untraced helper" do
       result = MixedModule.traced_public(5)
-      assert result == 15  # 5 + (5 * 2)
+      # 5 + (5 * 2)
+      assert result == 15
     end
 
     test "inline traced can be used inside module with use" do
@@ -283,12 +284,14 @@ defmodule ObservLib.TracedTest do
 
   describe "macro expansion" do
     test "traced macro generates valid AST" do
-      ast = quote do
-        import ObservLib.Traced
-        traced "test_span", %{key: "value"} do
-          :test_result
+      ast =
+        quote do
+          import ObservLib.Traced
+
+          traced "test_span", %{key: "value"} do
+            :test_result
+          end
         end
-      end
 
       # Macro should expand without errors
       expanded = Macro.expand(ast, __ENV__)
@@ -296,12 +299,14 @@ defmodule ObservLib.TracedTest do
     end
 
     test "traced macro with no attributes generates valid AST" do
-      ast = quote do
-        import ObservLib.Traced
-        traced "test_span" do
-          :result
+      ast =
+        quote do
+          import ObservLib.Traced
+
+          traced "test_span" do
+            :result
+          end
         end
-      end
 
       expanded = Macro.expand(ast, __ENV__)
       assert is_tuple(expanded)

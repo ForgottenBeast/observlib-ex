@@ -145,19 +145,20 @@ defmodule ObservLib.Security.HeaderRedactionTest do
 
     test "error logs use redacted headers" do
       # Simulate an export failure that would log headers
-      log = capture_log(fn ->
-        # Create a mock error with sensitive headers
-        error_context = %{
-          "Authorization" => "Bearer super_secret_token",
-          "X-API-Key" => "api_key_123456"
-        }
+      log =
+        capture_log(fn ->
+          # Create a mock error with sensitive headers
+          error_context = %{
+            "Authorization" => "Bearer super_secret_token",
+            "X-API-Key" => "api_key_123456"
+          }
 
-        # Redact before logging (as done in OtlpLogsExporter)
-        safe_context = HTTP.redact_sensitive_headers(error_context)
+          # Redact before logging (as done in OtlpLogsExporter)
+          safe_context = HTTP.redact_sensitive_headers(error_context)
 
-        require Logger
-        Logger.error("Export failed: #{inspect(safe_context)}")
-      end)
+          require Logger
+          Logger.error("Export failed: #{inspect(safe_context)}")
+        end)
 
       # Log should contain redacted marker, not actual secrets
       assert log =~ "[REDACTED]"
@@ -168,14 +169,16 @@ defmodule ObservLib.Security.HeaderRedactionTest do
     test "handles atom keys in error context" do
       error_context = %{
         Authorization: "Bearer secret",
-        :x_api_key => "api_secret",
+        x_api_key: "api_secret",
         content_type: "application/json"
       }
 
       redacted = HTTP.redact_sensitive_headers(error_context)
 
       assert redacted[:Authorization] == "[REDACTED]" or redacted["Authorization"] == "[REDACTED]"
-      assert redacted[:content_type] == "application/json" or redacted["content_type"] == "application/json"
+
+      assert redacted[:content_type] == "application/json" or
+               redacted["content_type"] == "application/json"
     end
   end
 end

@@ -22,9 +22,10 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     test "logs warning when truncating values" do
       large_value = String.duplicate("y", 10_000)
 
-      log = capture_log(fn ->
-        ObservLib.Attributes.validate(%{"data" => large_value})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Attributes.validate(%{"data" => large_value})
+        end)
 
       assert log =~ "Attribute value truncated"
       assert log =~ "original_size: 10000"
@@ -57,9 +58,9 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     @tag timeout: 60_000
     property "handles arbitrary size strings without crashing" do
       check all(
-        size <- StreamData.integer(0..50_000),
-        max_runs: 50
-      ) do
+              size <- StreamData.integer(0..50_000),
+              max_runs: 50
+            ) do
         value = String.duplicate("a", size)
         {:ok, result} = ObservLib.Attributes.validate(%{"key" => value})
 
@@ -75,12 +76,13 @@ defmodule ObservLib.Security.ResourceLimitsTest do
       # Create 200 attributes (exceeds default 128 limit)
       attrs = Map.new(1..200, fn i -> {"key_#{i}", "value_#{i}"} end)
 
-      log = capture_log(fn ->
-        {:ok, result} = ObservLib.Attributes.validate(attrs)
+      log =
+        capture_log(fn ->
+          {:ok, result} = ObservLib.Attributes.validate(attrs)
 
-        # Should be limited to 128
-        assert map_size(result) <= 128
-      end)
+          # Should be limited to 128
+          assert map_size(result) <= 128
+        end)
 
       assert log =~ "Attribute count exceeded"
       assert log =~ "limit: 128"
@@ -108,9 +110,9 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     @tag timeout: 60_000
     property "handles arbitrary attribute counts without crashing" do
       check all(
-        count <- StreamData.integer(0..500),
-        max_runs: 20
-      ) do
+              count <- StreamData.integer(0..500),
+              max_runs: 20
+            ) do
         attrs = Map.new(1..count, fn i -> {"k#{i}", "v#{i}"} end)
         {:ok, result} = ObservLib.Attributes.validate(attrs)
 
@@ -135,9 +137,10 @@ defmodule ObservLib.Security.ResourceLimitsTest do
       end
 
       # Exceeding should be rejected with warning
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter("test.metric", 1, %{id: 9999})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter("test.metric", 1, %{id: 9999})
+        end)
 
       assert log =~ "Metric cardinality limit exceeded"
 
@@ -149,9 +152,9 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     @tag timeout: 60_000
     property "cardinality limit prevents unbounded growth" do
       check all(
-        unique_id <- StreamData.integer(1..5000),
-        max_runs: 100
-      ) do
+              unique_id <- StreamData.integer(1..5000),
+              max_runs: 100
+            ) do
         ObservLib.Metrics.counter("prop.test", 1, %{id: unique_id})
 
         # Verify we never exceed the limit
@@ -166,19 +169,21 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     test "enforces maximum log batch size" do
       batch_limit = ObservLib.Config.get_log_batch_limit()
 
-      excessive_logs = for i <- 1..(batch_limit + 500) do
-        %{
-          level: :info,
-          message: "Log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{}
-        }
-      end
+      excessive_logs =
+        for i <- 1..(batch_limit + 500) do
+          %{
+            level: :info,
+            message: "Log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{}
+          }
+        end
 
-      log = capture_log(fn ->
-        ObservLib.Exporters.OtlpLogsExporter.add_to_batch(excessive_logs)
-        Process.sleep(100)
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Exporters.OtlpLogsExporter.add_to_batch(excessive_logs)
+          Process.sleep(100)
+        end)
 
       assert log =~ "Log batch limit exceeded"
       assert log =~ "dropped"
@@ -188,9 +193,10 @@ defmodule ObservLib.Security.ResourceLimitsTest do
   describe "sec-010: Span count limits" do
     test "span tracking has bounded memory usage" do
       # Create many spans
-      spans = for i <- 1..1000 do
-        ObservLib.Traces.Provider.start_span("span_#{i}", %{})
-      end
+      spans =
+        for i <- 1..1000 do
+          ObservLib.Traces.Provider.start_span("span_#{i}", %{})
+        end
 
       # Verify tracking
       count = ObservLib.Traces.Provider.active_span_count()

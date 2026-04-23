@@ -50,7 +50,12 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
 
     test "uses otlp_traces_endpoint without modification when provided" do
       Application.put_env(:observlib, :otlp_endpoint, "http://collector:4318")
-      Application.put_env(:observlib, :otlp_traces_endpoint, "http://traces.collector:4318/custom/path")
+
+      Application.put_env(
+        :observlib,
+        :otlp_traces_endpoint,
+        "http://traces.collector:4318/custom/path"
+      )
 
       assert {:ok, config} = OtlpTraceExporter.get_configuration()
       # Specific traces endpoint takes precedence
@@ -100,7 +105,12 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
     end
 
     test "handles all configuration options together" do
-      Application.put_env(:observlib, :otlp_traces_endpoint, "https://api.example.com:443/v1/traces")
+      Application.put_env(
+        :observlib,
+        :otlp_traces_endpoint,
+        "https://api.example.com:443/v1/traces"
+      )
+
       Application.put_env(:observlib, :otlp_protocol, :grpc)
       Application.put_env(:observlib, :otlp_compression, :gzip)
       Application.put_env(:observlib, :otlp_batch_size, 256)
@@ -155,7 +165,9 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
 
       # Verify the exporter configuration was set
       assert Application.get_env(:opentelemetry_exporter, :otlp_protocol) == :http_protobuf
-      assert Application.get_env(:opentelemetry_exporter, :otlp_traces_endpoint) == "http://localhost:4318/v1/traces"
+
+      assert Application.get_env(:opentelemetry_exporter, :otlp_traces_endpoint) ==
+               "http://localhost:4318/v1/traces"
 
       # Verify OpenTelemetry is configured for batch processing
       assert Application.get_env(:opentelemetry, :span_processor) == :batch
@@ -167,7 +179,8 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
 
       assert :ok = OtlpTraceExporter.setup()
 
-      assert Application.get_env(:opentelemetry_exporter, :otlp_traces_endpoint) == "http://custom:4318/traces"
+      assert Application.get_env(:opentelemetry_exporter, :otlp_traces_endpoint) ==
+               "http://custom:4318/traces"
     end
 
     test "configures opentelemetry_exporter with grpc protocol" do

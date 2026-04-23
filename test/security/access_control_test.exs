@@ -31,12 +31,13 @@ defmodule ObservLib.Security.AccessControlTest do
       ObservLib.Metrics.counter("access.test", 1, %{source: "test"})
 
       # Read from a different process
-      task = Task.async(fn ->
-        # Should be able to read
-        metrics = :ets.tab2list(:observlib_metrics)
-        assert is_list(metrics)
-        metrics
-      end)
+      task =
+        Task.async(fn ->
+          # Should be able to read
+          metrics = :ets.tab2list(:observlib_metrics)
+          assert is_list(metrics)
+          metrics
+        end)
 
       result = Task.await(task)
       assert is_list(result)
@@ -44,14 +45,19 @@ defmodule ObservLib.Security.AccessControlTest do
 
     test "external processes cannot write to protected ETS tables" do
       # Attempt to write from a different process
-      task = Task.async(fn ->
-        try do
-          :ets.insert(:observlib_metrics, {{"malicious.metric", %{}}, %{type: :counter, value: 999}})
-          :write_succeeded
-        rescue
-          ArgumentError -> :write_failed
-        end
-      end)
+      task =
+        Task.async(fn ->
+          try do
+            :ets.insert(
+              :observlib_metrics,
+              {{"malicious.metric", %{}}, %{type: :counter, value: 999}}
+            )
+
+            :write_succeeded
+          rescue
+            ArgumentError -> :write_failed
+          end
+        end)
 
       result = Task.await(task)
       assert result == :write_failed
@@ -62,14 +68,15 @@ defmodule ObservLib.Security.AccessControlTest do
       ObservLib.Metrics.counter("protected.metric", 1, %{})
 
       # Attempt to delete from a different process
-      task = Task.async(fn ->
-        try do
-          :ets.delete(:observlib_metrics, {"protected.metric", %{}})
-          :delete_succeeded
-        rescue
-          ArgumentError -> :delete_failed
-        end
-      end)
+      task =
+        Task.async(fn ->
+          try do
+            :ets.delete(:observlib_metrics, {"protected.metric", %{}})
+            :delete_succeeded
+          rescue
+            ArgumentError -> :delete_failed
+          end
+        end)
 
       result = Task.await(task)
       assert result == :delete_failed
@@ -81,14 +88,15 @@ defmodule ObservLib.Security.AccessControlTest do
       ObservLib.Metrics.counter("test.metric.2", 1, %{})
 
       # Attempt to clear from a different process
-      task = Task.async(fn ->
-        try do
-          :ets.delete_all_objects(:observlib_metrics)
-          :clear_succeeded
-        rescue
-          ArgumentError -> :clear_failed
-        end
-      end)
+      task =
+        Task.async(fn ->
+          try do
+            :ets.delete_all_objects(:observlib_metrics)
+            :clear_succeeded
+          rescue
+            ArgumentError -> :clear_failed
+          end
+        end)
 
       result = Task.await(task)
       assert result == :clear_failed

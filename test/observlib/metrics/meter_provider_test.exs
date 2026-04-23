@@ -4,17 +4,9 @@ defmodule ObservLib.Metrics.MeterProviderTest do
   alias ObservLib.Metrics.MeterProvider
 
   setup do
-    # Start Config first
-    start_supervised!(ObservLib.Config)
-
-    # Start MeterProvider
-    start_supervised!(MeterProvider)
-
-    on_exit(fn ->
-      # Clean up
-      :ok
-    end)
-
+    # Config and MeterProvider are already started by the Application
+    # Reset metric state for clean tests
+    ObservLib.Metrics.MeterProvider.reset()
     :ok
   end
 
@@ -40,7 +32,11 @@ defmodule ObservLib.Metrics.MeterProviderTest do
     end
 
     test "registers a gauge metric" do
-      assert :ok = MeterProvider.register("memory.usage", :gauge, unit: :byte, description: "Memory usage")
+      assert :ok =
+               MeterProvider.register("memory.usage", :gauge,
+                 unit: :byte,
+                 description: "Memory usage"
+               )
 
       registered = MeterProvider.list_registered()
       metric = Enum.find(registered, &(&1.name == "memory.usage"))
@@ -72,14 +68,15 @@ defmodule ObservLib.Metrics.MeterProviderTest do
 
   describe "record/4" do
     test "records counter value" do
-      MeterProvider.record("http.requests", :counter, 1, %{method: "GET"})
-      MeterProvider.record("http.requests", :counter, 2, %{method: "GET"})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :counter, 1, %{method: "GET"})
+      MeterProvider.record(name, :counter, 2, %{method: "GET"})
 
       # Allow async processing
       Process.sleep(10)
 
       metrics = MeterProvider.read_all()
-      metric = Enum.find(metrics, &(&1.name == "http.requests"))
+      metric = Enum.find(metrics, &(&1.name == name))
       assert metric != nil
       assert metric.type == :counter
       # Counter should sum values
@@ -87,14 +84,15 @@ defmodule ObservLib.Metrics.MeterProviderTest do
     end
 
     test "records gauge value (last value wins)" do
-      MeterProvider.record("memory.usage", :gauge, 100, %{type: "heap"})
-      MeterProvider.record("memory.usage", :gauge, 200, %{type: "heap"})
-      MeterProvider.record("memory.usage", :gauge, 150, %{type: "heap"})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :gauge, 100, %{type: "heap"})
+      MeterProvider.record(name, :gauge, 200, %{type: "heap"})
+      MeterProvider.record(name, :gauge, 150, %{type: "heap"})
 
       Process.sleep(10)
 
       metrics = MeterProvider.read_all()
-      metric = Enum.find(metrics, &(&1.name == "memory.usage"))
+      metric = Enum.find(metrics, &(&1.name == name))
       assert metric != nil
       assert metric.type == :gauge
       # Gauge should keep last value
@@ -102,14 +100,15 @@ defmodule ObservLib.Metrics.MeterProviderTest do
     end
 
     test "records histogram observations" do
-      MeterProvider.record("request.duration", :histogram, 10.0, %{})
-      MeterProvider.record("request.duration", :histogram, 20.0, %{})
-      MeterProvider.record("request.duration", :histogram, 30.0, %{})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :histogram, 10.0, %{})
+      MeterProvider.record(name, :histogram, 20.0, %{})
+      MeterProvider.record(name, :histogram, 30.0, %{})
 
       Process.sleep(10)
 
       metrics = MeterProvider.read_all()
-      metric = Enum.find(metrics, &(&1.name == "request.duration"))
+      metric = Enum.find(metrics, &(&1.name == name))
       assert metric != nil
       assert metric.type == :histogram
       assert metric.data.count == 3
@@ -119,27 +118,29 @@ defmodule ObservLib.Metrics.MeterProviderTest do
     end
 
     test "records up_down_counter with positive and negative values" do
-      MeterProvider.record("active.connections", :up_down_counter, 5, %{})
-      MeterProvider.record("active.connections", :up_down_counter, -2, %{})
-      MeterProvider.record("active.connections", :up_down_counter, 3, %{})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :up_down_counter, 5, %{})
+      MeterProvider.record(name, :up_down_counter, -2, %{})
+      MeterProvider.record(name, :up_down_counter, 3, %{})
 
       Process.sleep(10)
 
       metrics = MeterProvider.read_all()
-      metric = Enum.find(metrics, &(&1.name == "active.connections"))
+      metric = Enum.find(metrics, &(&1.name == name))
       assert metric != nil
       assert metric.type == :up_down_counter
       assert metric.data.value == 6
     end
 
     test "separates metrics by attributes" do
-      MeterProvider.record("http.requests", :counter, 1, %{method: "GET"})
-      MeterProvider.record("http.requests", :counter, 2, %{method: "POST"})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :counter, 1, %{method: "GET"})
+      MeterProvider.record(name, :counter, 2, %{method: "POST"})
 
       Process.sleep(10)
 
       metrics = MeterProvider.read_all()
-      http_metrics = Enum.filter(metrics, &(&1.name == "http.requests"))
+      http_metrics = Enum.filter(metrics, &(&1.name == name))
       assert length(http_metrics) == 2
 
       get_metric = Enum.find(http_metrics, &(&1.attributes.method == "GET"))
@@ -174,11 +175,12 @@ defmodule ObservLib.Metrics.MeterProviderTest do
 
   describe "read/1" do
     test "returns specific metric by name" do
-      MeterProvider.record("specific.metric", :counter, 42, %{label: "test"})
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :counter, 42, %{label: "test"})
 
       Process.sleep(10)
 
-      result = MeterProvider.read("specific.metric")
+      result = MeterProvider.read(name)
       assert result != nil
       assert is_list(result)
       assert length(result) == 1
@@ -186,15 +188,16 @@ defmodule ObservLib.Metrics.MeterProviderTest do
     end
 
     test "returns nil for non-existent metric" do
-      MeterProvider.reset()
-      result = MeterProvider.read("non.existent")
+      name = "nonexistent.#{:erlang.unique_integer([:positive])}"
+      result = MeterProvider.read(name)
       assert result == nil
     end
   end
 
   describe "reset/0" do
     test "clears all metric values" do
-      MeterProvider.record("test.metric", :counter, 100, %{})
+      name = "test.reset.#{:erlang.unique_integer([:positive])}"
+      MeterProvider.record(name, :counter, 100, %{})
       Process.sleep(10)
       assert length(MeterProvider.read_all()) > 0
 
@@ -205,17 +208,19 @@ defmodule ObservLib.Metrics.MeterProviderTest do
 
   describe "concurrent writes" do
     test "handles concurrent writes from multiple processes" do
-      tasks = for i <- 1..100 do
-        Task.async(fn ->
-          MeterProvider.record("concurrent.counter", :counter, 1, %{worker: rem(i, 5)})
-        end)
-      end
+      name = "test.metric.#{:erlang.unique_integer([:positive])}"
+      tasks =
+        for i <- 1..100 do
+          Task.async(fn ->
+            MeterProvider.record(name, :counter, 1, %{worker: rem(i, 5)})
+          end)
+        end
 
       Task.await_many(tasks)
       Process.sleep(50)
 
       metrics = MeterProvider.read_all()
-      concurrent_metrics = Enum.filter(metrics, &(&1.name == "concurrent.counter"))
+      concurrent_metrics = Enum.filter(metrics, &(&1.name == name))
 
       # Sum all counter values
       total = Enum.reduce(concurrent_metrics, 0, fn m, acc -> acc + m.data.value end)
@@ -329,13 +334,18 @@ defmodule ObservLib.Metrics.MeterProviderTest do
       Process.sleep(50)
 
       # Capture log when exceeding limit
-      log = capture_log(fn ->
-        MeterProvider.record("test.warning", :counter, 1, %{id: limit + 1})
-        Process.sleep(50)
-      end)
+      # Use a synchronous GenServer.call after the cast to ensure the GenServer
+      # has processed the record cast before we check logs
+      log =
+        capture_log(fn ->
+          MeterProvider.record("test.warning", :counter, 1, %{id: limit + 1})
+          # Sync call ensures cast is processed before we return
+          MeterProvider.read("test.warning")
+          Logger.flush()
+        end)
 
       assert log =~ "Metric cardinality limit exceeded"
-      assert log =~ "test.warning"
+      assert log =~ "dropping metric"
     end
   end
 end

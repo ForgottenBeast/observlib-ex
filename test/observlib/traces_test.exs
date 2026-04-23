@@ -173,17 +173,19 @@ defmodule ObservLib.TracesTest do
 
   describe "with_span/3" do
     test "executes function within span context" do
-      result = ObservLib.Traces.with_span("test_operation", %{}, fn ->
-        :test_result
-      end)
+      result =
+        ObservLib.Traces.with_span("test_operation", %{}, fn ->
+          :test_result
+        end)
 
       assert result == :test_result
     end
 
     test "executes function with attributes" do
-      result = ObservLib.Traces.with_span("test_operation", %{"key" => "value"}, fn ->
-        {:ok, "success"}
-      end)
+      result =
+        ObservLib.Traces.with_span("test_operation", %{"key" => "value"}, fn ->
+          {:ok, "success"}
+        end)
 
       assert result == {:ok, "success"}
     end
@@ -197,21 +199,24 @@ defmodule ObservLib.TracesTest do
     end
 
     test "propagates function return value" do
-      result = ObservLib.Traces.with_span("calculation", %{}, fn ->
-        2 + 2
-      end)
+      result =
+        ObservLib.Traces.with_span("calculation", %{}, fn ->
+          2 + 2
+        end)
 
       assert result == 4
     end
 
     test "allows nested spans" do
-      outer_result = ObservLib.Traces.with_span("outer_span", %{}, fn ->
-        inner_result = ObservLib.Traces.with_span("inner_span", %{}, fn ->
-          :inner_value
-        end)
+      outer_result =
+        ObservLib.Traces.with_span("outer_span", %{}, fn ->
+          inner_result =
+            ObservLib.Traces.with_span("inner_span", %{}, fn ->
+              :inner_value
+            end)
 
-        {:outer, inner_result}
-      end)
+          {:outer, inner_result}
+        end)
 
       assert outer_result == {:outer, :inner_value}
     end
@@ -267,18 +272,19 @@ defmodule ObservLib.TracesTest do
 
   describe "nested spans" do
     test "creates nested span hierarchy" do
-      result = ObservLib.Traces.with_span("root", %{}, fn ->
-        ObservLib.Traces.set_attribute("level", "root")
+      result =
+        ObservLib.Traces.with_span("root", %{}, fn ->
+          ObservLib.Traces.set_attribute("level", "root")
 
-        ObservLib.Traces.with_span("child1", %{}, fn ->
-          ObservLib.Traces.set_attribute("level", "child1")
+          ObservLib.Traces.with_span("child1", %{}, fn ->
+            ObservLib.Traces.set_attribute("level", "child1")
 
-          ObservLib.Traces.with_span("grandchild", %{}, fn ->
-            ObservLib.Traces.set_attribute("level", "grandchild")
-            :success
+            ObservLib.Traces.with_span("grandchild", %{}, fn ->
+              ObservLib.Traces.set_attribute("level", "grandchild")
+              :success
+            end)
           end)
         end)
-      end)
 
       assert result == :success
     end
@@ -330,10 +336,13 @@ defmodule ObservLib.TracesTest do
 
   describe "property-based tests" do
     property "any valid span name can start a span" do
-      check all span_name <- one_of([
+      check all(
+              span_name <-
+                one_of([
                   string(:printable, min_length: 1),
                   atom(:alphanumeric)
-                ]) do
+                ])
+            ) do
         span = ObservLib.Traces.start_span(span_name)
         assert is_tuple(span)
         ObservLib.Traces.end_span(span)
@@ -341,12 +350,15 @@ defmodule ObservLib.TracesTest do
     end
 
     property "attributes can be any string key-value pairs" do
-      check all key <- string(:printable, min_length: 1),
-                value <- one_of([
+      check all(
+              key <- string(:printable, min_length: 1),
+              value <-
+                one_of([
                   string(:printable),
                   integer(),
                   boolean()
-                ]) do
+                ])
+            ) do
         attributes = %{key => value}
         span = ObservLib.Traces.start_span("test", attributes)
         assert is_tuple(span)

@@ -44,7 +44,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "produces valid OTLP JSON structure", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       # Record a metric
       ObservLib.Metrics.counter("test.metric", 1, %{label: "value"})
@@ -81,7 +83,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "counter metrics have correct OTLP format", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       ObservLib.Metrics.counter("http.requests", 42, %{method: "GET"})
       Process.sleep(50)
@@ -92,7 +96,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       metrics = MockOtlpServer.get_metrics(server)
       [payload | _] = metrics
 
-      scope_metrics = get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+      scope_metrics =
+        get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+
       assert is_list(scope_metrics)
 
       counter_metric = Enum.find(scope_metrics, fn m -> m["name"] == "http.requests" end)
@@ -116,7 +122,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "gauge metrics have correct OTLP format", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       ObservLib.Metrics.gauge("memory.usage", 1024.5, %{type: "heap"})
       Process.sleep(50)
@@ -127,7 +135,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       metrics = MockOtlpServer.get_metrics(server)
       [payload | _] = metrics
 
-      scope_metrics = get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+      scope_metrics =
+        get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+
       gauge_metric = Enum.find(scope_metrics, fn m -> m["name"] == "memory.usage" end)
       assert gauge_metric != nil
 
@@ -145,7 +155,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "histogram metrics have correct OTLP format", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       ObservLib.Metrics.histogram("request.duration", 50.0, %{})
       ObservLib.Metrics.histogram("request.duration", 150.0, %{})
@@ -157,7 +169,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       metrics = MockOtlpServer.get_metrics(server)
       [payload | _] = metrics
 
-      scope_metrics = get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+      scope_metrics =
+        get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+
       histogram_metric = Enum.find(scope_metrics, fn m -> m["name"] == "request.duration" end)
       assert histogram_metric != nil
 
@@ -178,12 +192,15 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "attributes are correctly formatted", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       ObservLib.Metrics.counter("test.attrs", 1, %{
         string_attr: "value",
         int_attr: 42
       })
+
       Process.sleep(50)
 
       :ok = ObservLib.Exporters.OtlpMetricsExporter.force_export()
@@ -192,7 +209,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       metrics = MockOtlpServer.get_metrics(server)
       [payload | _] = metrics
 
-      scope_metrics = get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+      scope_metrics =
+        get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+
       metric = Enum.find(scope_metrics, fn m -> m["name"] == "test.attrs" end)
       [data_point | _] = metric["sum"]["dataPoints"]
 
@@ -208,13 +227,16 @@ defmodule ObservLib.Integration.OtlpExportTest do
       int_attr = Enum.find(attributes, fn a -> a["key"] == "int_attr" end)
       assert int_attr != nil
       # Int values are encoded as strings in OTLP JSON
-      assert Map.has_key?(int_attr["value"], "intValue") or Map.has_key?(int_attr["value"], "stringValue")
+      assert Map.has_key?(int_attr["value"], "intValue") or
+               Map.has_key?(int_attr["value"], "stringValue")
     end
 
     test "resource attributes are included", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       ObservLib.Metrics.counter("resource.test", 1, %{})
       Process.sleep(50)
@@ -225,7 +247,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       metrics = MockOtlpServer.get_metrics(server)
       [payload | _] = metrics
 
-      resource_attrs = get_in(payload, ["resourceMetrics", Access.at(0), "resource", "attributes"])
+      resource_attrs =
+        get_in(payload, ["resourceMetrics", Access.at(0), "resource", "attributes"])
+
       assert is_list(resource_attrs)
 
       # Should have service.name
@@ -239,7 +263,11 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "produces valid OTLP JSON structure", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 50]})
+
+      {:ok, _exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 50]}
+        )
 
       # Directly add log to exporter (bypassing Logger)
       log_record = %{
@@ -248,6 +276,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
         timestamp: System.system_time(:nanosecond),
         attributes: %{test_attr: "value"}
       }
+
       ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
 
       Process.sleep(200)
@@ -269,7 +298,11 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "log records have correct OTLP format", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 50]})
+
+      {:ok, _exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter, [batch_size: 1, batch_timeout: 50]}
+        )
 
       log_record = %{
         level: :error,
@@ -277,6 +310,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
         timestamp: System.system_time(:nanosecond),
         attributes: %{error_code: "E001"}
       }
+
       ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
 
       Process.sleep(200)
@@ -297,7 +331,8 @@ defmodule ObservLib.Integration.OtlpExportTest do
       assert Map.has_key?(record, "body")
 
       # Severity should match error level
-      assert record["severity_number"] == 17  # Error severity
+      # Error severity
+      assert record["severity_number"] == 17
       assert record["severity_text"] == "ERROR"
     end
 
@@ -322,11 +357,16 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "metrics exporter retries on 503 errors", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [
-        export_interval: 100_000,
-        max_retries: 3,
-        retry_delay: 50
-      ]})
+
+      {:ok, _exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpMetricsExporter,
+           [
+             export_interval: 100_000,
+             max_retries: 3,
+             retry_delay: 50
+           ]}
+        )
 
       # Set server to return error then success
       MockOtlpServer.set_response_mode(server, :error_then_success)
@@ -346,11 +386,16 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "logs exporter retries on transient failures", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [
-        batch_size: 1,
-        batch_timeout: 50,
-        max_retries: 3
-      ]})
+
+      {:ok, _exporter} =
+        start_supervised(
+          {ObservLib.Exporters.OtlpLogsExporter,
+           [
+             batch_size: 1,
+             batch_timeout: 50,
+             max_retries: 3
+           ]}
+        )
 
       # Set server to return error then success
       MockOtlpServer.set_response_mode(server, :error_then_success)
@@ -361,6 +406,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
         timestamp: System.system_time(:nanosecond),
         attributes: %{}
       }
+
       ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
 
       Process.sleep(500)
@@ -375,7 +421,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "metrics are batched before export", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       # Record multiple metrics
       ObservLib.Metrics.counter("batch.metric1", 1, %{})
@@ -392,7 +440,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
       assert length(metrics) == 1
 
       [payload | _] = metrics
-      scope_metrics = get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
+
+      scope_metrics =
+        get_in(payload, ["resourceMetrics", Access.at(0), "scopeMetrics", Access.at(0), "metrics"])
 
       # All three metrics should be in the batch
       assert length(scope_metrics) == 3
@@ -401,10 +451,14 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "logs batch on size threshold", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [
-        batch_size: 3,
-        batch_timeout: 10_000  # Long timeout to ensure size-based flush
-      ]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpLogsExporter,
+         [
+           batch_size: 3,
+           # Long timeout to ensure size-based flush
+           batch_timeout: 10_000
+         ]})
 
       # Add logs up to batch size
       for i <- 1..3 do
@@ -414,6 +468,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
           timestamp: System.system_time(:nanosecond),
           attributes: %{index: i}
         }
+
         ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
       end
 
@@ -433,10 +488,15 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "logs batch on timeout", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [
-        batch_size: 100,  # High threshold
-        batch_timeout: 100  # Short timeout
-      ]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpLogsExporter,
+         [
+           # High threshold
+           batch_size: 100,
+           # Short timeout
+           batch_timeout: 100
+         ]})
 
       # Add single log (won't hit size threshold)
       log_record = %{
@@ -445,6 +505,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
         timestamp: System.system_time(:nanosecond),
         attributes: %{}
       }
+
       ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
 
       # Wait for timeout flush
@@ -457,10 +518,14 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "flush forces immediate export", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpLogsExporter, [
-        batch_size: 100,
-        batch_timeout: 60_000  # Very long timeout
-      ]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpLogsExporter,
+         [
+           batch_size: 100,
+           # Very long timeout
+           batch_timeout: 60_000
+         ]})
 
       log_record = %{
         level: :info,
@@ -468,6 +533,7 @@ defmodule ObservLib.Integration.OtlpExportTest do
         timestamp: System.system_time(:nanosecond),
         attributes: %{}
       }
+
       ObservLib.Exporters.OtlpLogsExporter.add_to_batch([log_record])
 
       # Flush immediately
@@ -483,7 +549,9 @@ defmodule ObservLib.Integration.OtlpExportTest do
     test "metrics exporter tracks export counts", %{server: server} do
       {:ok, _config} = start_supervised({ObservLib.Config, []})
       {:ok, _meter_provider} = start_supervised({ObservLib.Metrics.MeterProvider, []})
-      {:ok, _exporter} = start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
+
+      {:ok, _exporter} =
+        start_supervised({ObservLib.Exporters.OtlpMetricsExporter, [export_interval: 100_000]})
 
       # Initial stats
       stats = ObservLib.Exporters.OtlpMetricsExporter.get_stats()

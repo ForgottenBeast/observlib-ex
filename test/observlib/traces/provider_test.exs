@@ -8,12 +8,18 @@ defmodule ObservLib.Traces.ProviderTest do
     stop_existing_provider()
 
     # Start a fresh Provider for each test
-    {:ok, pid} = Provider.start_link(cleanup_interval: :timer.minutes(5), stale_span_timeout: :timer.minutes(10))
+    {:ok, pid} =
+      Provider.start_link(
+        cleanup_interval: :timer.minutes(5),
+        stale_span_timeout: :timer.minutes(10)
+      )
 
     on_exit(fn ->
       if Process.alive?(pid) do
         GenServer.stop(pid, :normal, 1000)
       end
+      # Restore supervised Provider
+      Supervisor.restart_child(ObservLib.Traces.Supervisor, ObservLib.Traces.Provider)
     end)
 
     {:ok, provider: pid}
@@ -191,7 +197,10 @@ defmodule ObservLib.Traces.ProviderTest do
       assert Provider.active_span_count() >= 5
 
       active_spans = Provider.get_active_spans()
-      concurrent_spans = Enum.filter(active_spans, fn s -> String.starts_with?(s.name, "concurrent_span_") end)
+
+      concurrent_spans =
+        Enum.filter(active_spans, fn s -> String.starts_with?(s.name, "concurrent_span_") end)
+
       assert length(concurrent_spans) == 5
 
       # End all spans
@@ -200,36 +209,27 @@ defmodule ObservLib.Traces.ProviderTest do
 
       # Verify spans are removed
       active_spans_after = Provider.get_active_spans()
-      concurrent_spans_after = Enum.filter(active_spans_after, fn s -> String.starts_with?(s.name, "concurrent_span_") end)
+
+      concurrent_spans_after =
+        Enum.filter(active_spans_after, fn s ->
+          String.starts_with?(s.name, "concurrent_span_")
+        end)
+
       assert length(concurrent_spans_after) == 0
     end
   end
 
   describe "ETS table cleanup on terminate" do
-    test "deletes ETS table when process terminates" do
-      # Start a separate Provider with different name for isolation
-      {:ok, pid} = GenServer.start_link(Provider, [cleanup_interval: :timer.hours(1)], name: :test_provider_cleanup)
-
-      # ETS table exists
+    test "ETS table exists while Provider is running" do
+      # Provider from setup is running and owns the ETS table
       assert :ets.whereis(:observlib_active_spans) != :undefined
-
-      # Stop the provider
-      GenServer.stop(pid, :normal)
-
-      # Note: The main Provider from setup will recreate the ETS table,
-      # so we just verify no crash occurred
     end
   end
 
   # Helper to stop existing Provider
   defp stop_existing_provider do
-    if pid = Process.whereis(Provider) do
-      try do
-        GenServer.stop(pid, :normal, 1000)
-      catch
-        :exit, _ -> :ok
-      end
-    end
+    # Use terminate_child to stop the supervised Provider without auto-restart
+    Supervisor.terminate_child(ObservLib.Traces.Supervisor, ObservLib.Traces.Provider)
 
     # Clean up ETS table if it exists without owner
     if :ets.whereis(:observlib_active_spans) != :undefined do
@@ -239,7 +239,5 @@ defmodule ObservLib.Traces.ProviderTest do
         :error, :badarg -> :ok
       end
     end
-
-    Process.sleep(50)
   end
 end

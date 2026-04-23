@@ -79,7 +79,12 @@ defmodule ObservLib.Integration.PrometheusTest do
       Process.sleep(50)
 
       {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, port, [:binary, active: false])
-      :ok = :gen_tcp.send(socket, "POST /metrics HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
+
+      :ok =
+        :gen_tcp.send(
+          socket,
+          "POST /metrics HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n"
+        )
 
       {:ok, response} = :gen_tcp.recv(socket, 0, 5000)
       :gen_tcp.close(socket)
@@ -113,7 +118,7 @@ defmodule ObservLib.Integration.PrometheusTest do
       {:ok, _reader} = start_supervised({ObservLib.Metrics.PrometheusReader, [port: port]})
 
       # Record gauge metric
-      ObservLib.Metrics.gauge("memory_usage_bytes", 1048576.0, %{type: "heap"})
+      ObservLib.Metrics.gauge("memory_usage_bytes", 1_048_576.0, %{type: "heap"})
       Process.sleep(50)
 
       body = scrape_metrics(port)

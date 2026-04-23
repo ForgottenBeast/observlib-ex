@@ -12,9 +12,10 @@ defmodule ObservLib.Security.AtomExhaustionTest do
       _ = String.to_atom("existing_metric")
 
       # Should not log warning for existing atom
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter("existing_metric", 1, %{})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter("existing_metric", 1, %{})
+        end)
 
       refute log =~ "Creating new atom"
     end
@@ -22,9 +23,10 @@ defmodule ObservLib.Security.AtomExhaustionTest do
     test "safe_to_atom/1 warns when creating new atoms" do
       unique_name = "metric_#{System.unique_integer([:positive])}"
 
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter(unique_name, 1, %{})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter(unique_name, 1, %{})
+        end)
 
       assert log =~ "Creating new atom for metric segment"
       assert log =~ "Consider pre-registering metrics"
@@ -33,9 +35,9 @@ defmodule ObservLib.Security.AtomExhaustionTest do
     @tag timeout: 120_000
     property "VM survives unbounded unique metric names" do
       check all(
-        metric_suffix <- StreamData.string(:alphanumeric, min_length: 10, max_length: 20),
-        max_runs: 1000
-      ) do
+              metric_suffix <- StreamData.string(:alphanumeric, min_length: 10, max_length: 20),
+              max_runs: 1000
+            ) do
         metric_name = "test_metric_#{metric_suffix}"
 
         # Should not crash the VM
@@ -50,9 +52,10 @@ defmodule ObservLib.Security.AtomExhaustionTest do
       ObservLib.Metrics.register_counter(metric_name, unit: :count)
 
       # Now recording should not log warnings (atoms already exist)
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter(metric_name, 1, %{})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter(metric_name, 1, %{})
+        end)
 
       # Should not contain the warning since segments are already atoms
       # Note: May still warn if metric name segments are new
@@ -79,9 +82,9 @@ defmodule ObservLib.Security.AtomExhaustionTest do
     @tag timeout: 60_000
     property "telemetry handlers survive many unique prefixes" do
       check all(
-        suffix <- StreamData.integer(1..1000),
-        max_runs: 100
-      ) do
+              suffix <- StreamData.integer(1..1000),
+              max_runs: 100
+            ) do
         prefix = [String.to_atom("test#{suffix}"), :event]
 
         # Attach and detach handler

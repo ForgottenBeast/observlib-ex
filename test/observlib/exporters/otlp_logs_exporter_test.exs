@@ -129,10 +129,30 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
 
     test "handles log records with different severity levels", %{exporter_pid: _pid} do
       log_records = [
-        %{level: :debug, message: "Debug", timestamp: System.system_time(:nanosecond), attributes: %{}},
-        %{level: :info, message: "Info", timestamp: System.system_time(:nanosecond), attributes: %{}},
-        %{level: :warn, message: "Warn", timestamp: System.system_time(:nanosecond), attributes: %{}},
-        %{level: :error, message: "Error", timestamp: System.system_time(:nanosecond), attributes: %{}}
+        %{
+          level: :debug,
+          message: "Debug",
+          timestamp: System.system_time(:nanosecond),
+          attributes: %{}
+        },
+        %{
+          level: :info,
+          message: "Info",
+          timestamp: System.system_time(:nanosecond),
+          attributes: %{}
+        },
+        %{
+          level: :warn,
+          message: "Warn",
+          timestamp: System.system_time(:nanosecond),
+          attributes: %{}
+        },
+        %{
+          level: :error,
+          message: "Error",
+          timestamp: System.system_time(:nanosecond),
+          attributes: %{}
+        }
       ]
 
       result = OtlpLogsExporter.export(log_records)
@@ -200,8 +220,19 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
     end
 
     test "adds multiple batches", %{exporter_pid: _pid} do
-      log_record1 = %{level: :info, message: "Log 1", timestamp: System.system_time(:nanosecond), attributes: %{}}
-      log_record2 = %{level: :info, message: "Log 2", timestamp: System.system_time(:nanosecond), attributes: %{}}
+      log_record1 = %{
+        level: :info,
+        message: "Log 1",
+        timestamp: System.system_time(:nanosecond),
+        attributes: %{}
+      }
+
+      log_record2 = %{
+        level: :info,
+        message: "Log 2",
+        timestamp: System.system_time(:nanosecond),
+        attributes: %{}
+      }
 
       assert OtlpLogsExporter.add_to_batch([log_record1]) == :ok
       assert OtlpLogsExporter.add_to_batch([log_record2]) == :ok
@@ -211,7 +242,12 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
       # Start exporter with small batch size
       {:ok, pid} = OtlpLogsExporter.start_link(name: BatchTestExporter, batch_size: 2)
 
-      log_record = %{level: :info, message: "Test", timestamp: System.system_time(:nanosecond), attributes: %{}}
+      log_record = %{
+        level: :info,
+        message: "Test",
+        timestamp: System.system_time(:nanosecond),
+        attributes: %{}
+      }
 
       # Add records up to batch size
       GenServer.cast(BatchTestExporter, {:add_to_batch, [log_record]})
@@ -247,7 +283,13 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
     test "respects batch timeout" do
       {:ok, pid} = OtlpLogsExporter.start_link(name: TimeoutTestExporter, batch_timeout: 100)
 
-      log_record = %{level: :info, message: "Timeout test", timestamp: System.system_time(:nanosecond), attributes: %{}}
+      log_record = %{
+        level: :info,
+        message: "Timeout test",
+        timestamp: System.system_time(:nanosecond),
+        attributes: %{}
+      }
+
       GenServer.cast(TimeoutTestExporter, {:add_to_batch, [log_record]})
 
       # Wait for timeout to trigger flush
@@ -286,7 +328,12 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
     test "continues operating after export failure" do
       {:ok, pid} = OtlpLogsExporter.start_link(name: ErrorRecoveryExporter)
 
-      log_record = %{level: :info, message: "Test", timestamp: System.system_time(:nanosecond), attributes: %{}}
+      log_record = %{
+        level: :info,
+        message: "Test",
+        timestamp: System.system_time(:nanosecond),
+        attributes: %{}
+      }
 
       # First export will fail (no collector)
       GenServer.call(ErrorRecoveryExporter, {:export, [log_record]})
@@ -451,14 +498,15 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
       {:ok, pid} = OtlpLogsExporter.start_link(name: BatchLimitExporter, batch_limit: 5)
 
       # Create 10 log records
-      log_records = Enum.map(1..10, fn i ->
-        %{
-          level: :info,
-          message: "Log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{index: i}
-        }
-      end)
+      log_records =
+        Enum.map(1..10, fn i ->
+          %{
+            level: :info,
+            message: "Log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{index: i}
+          }
+        end)
 
       # Add all logs to batch
       GenServer.cast(BatchLimitExporter, {:add_to_batch, log_records})
@@ -475,14 +523,15 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
       {:ok, _pid} = OtlpLogsExporter.start_link(name: BatchLimitWarningExporter, batch_limit: 3)
 
       # Create 5 log records that exceed the limit
-      log_records = Enum.map(1..5, fn i ->
-        %{
-          level: :info,
-          message: "Log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{index: i}
-        }
-      end)
+      log_records =
+        Enum.map(1..5, fn i ->
+          %{
+            level: :info,
+            message: "Log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{index: i}
+          }
+        end)
 
       # This should trigger the warning
       GenServer.cast(BatchLimitWarningExporter, {:add_to_batch, log_records})
@@ -498,14 +547,15 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
       # In production, it would drop the oldest logs
       {:ok, pid} = OtlpLogsExporter.start_link(name: NewestLogsExporter, batch_limit: 5)
 
-      log_records = Enum.map(1..10, fn i ->
-        %{
-          level: :info,
-          message: "Log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{order: i}
-        }
-      end)
+      log_records =
+        Enum.map(1..10, fn i ->
+          %{
+            level: :info,
+            message: "Log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{order: i}
+          }
+        end)
 
       GenServer.cast(NewestLogsExporter, {:add_to_batch, log_records})
       Process.sleep(100)
@@ -524,14 +574,15 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
       {:ok, pid} = OtlpLogsExporter.start_link(name: MemoryExhaustionExporter, batch_limit: 100)
 
       # Generate many logs beyond the limit
-      log_records = Enum.map(1..200, fn i ->
-        %{
-          level: :info,
-          message: "Log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{index: i}
-        }
-      end)
+      log_records =
+        Enum.map(1..200, fn i ->
+          %{
+            level: :info,
+            message: "Log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{index: i}
+          }
+        end)
 
       # Add logs in batches to simulate continuous ingestion
       Enum.each(log_records, fn log ->

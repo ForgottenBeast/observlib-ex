@@ -5,22 +5,13 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
 
   @test_port 19568
 
-  setup do
-    # Start Config first
-    start_supervised!(ObservLib.Config)
-
-    # Start MeterProvider (required for PrometheusReader)
-    start_supervised!(MeterProvider)
-
-    # Start PrometheusReader with test port
+  setup_all do
+    # Config and MeterProvider are already started by the Application
+    # Start PrometheusReader once for all tests with test port
     start_supervised!({PrometheusReader, port: @test_port})
 
     # Wait for TCP listener to be ready
     Process.sleep(100)
-
-    on_exit(fn ->
-      :ok
-    end)
 
     :ok
   end
@@ -83,7 +74,8 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
 
       assert response =~ "HTTP/1.1 200 OK"
       # Content-Length should be 0 or body should be empty
-      assert response =~ "Content-Length: 0" or String.ends_with?(String.trim(response), "\r\n\r\n")
+      assert response =~ "Content-Length: 0" or
+               String.ends_with?(String.trim(response), "\r\n\r\n")
     end
 
     test "formats counter metrics in Prometheus format" do
@@ -223,11 +215,12 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
       max_conn = stats.max_connections
 
       # Create max_connections + 1 connections
-      sockets = for _ <- 1..max_conn do
-        {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
-        :ok = :gen_tcp.send(socket, "GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
-        socket
-      end
+      sockets =
+        for _ <- 1..max_conn do
+          {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
+          :ok = :gen_tcp.send(socket, "GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
+          socket
+        end
 
       Process.sleep(100)
 
@@ -264,24 +257,30 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
 
     test "rate limiter rejects requests when limit exceeded" do
       # Make many rapid requests to trigger rate limit
-      results = for _ <- 1..150 do
-        {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
-        :ok = :gen_tcp.send(socket, "GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
+      results =
+        for _ <- 1..150 do
+          {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
+          :ok = :gen_tcp.send(socket, "GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
 
-        result = case :gen_tcp.recv(socket, 0, 1000) do
-          {:ok, response} ->
-            cond do
-              response =~ "429" -> :rate_limited
-              response =~ "200" -> :ok
-              true -> :other
+          result =
+            case :gen_tcp.recv(socket, 0, 1000) do
+              {:ok, response} ->
+                cond do
+                  response =~ "429" -> :rate_limited
+                  response =~ "200" -> :ok
+                  true -> :other
+                end
+
+              {:error, :closed} ->
+                :closed
+
+              {:error, :timeout} ->
+                :timeout
             end
-          {:error, :closed} -> :closed
-          {:error, :timeout} -> :timeout
-        end
 
-        :gen_tcp.close(socket)
-        result
-      end
+          :gen_tcp.close(socket)
+          result
+        end
 
       # At least some requests should be rate limited
       rate_limited_count = Enum.count(results, &(&1 == :rate_limited))
@@ -451,9 +450,12 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
       :gen_tcp.close(socket)
 
       # All special characters should be escaped
-      assert response =~ "\\\\\\\\"  # backslash
-      assert response =~ "\\n"       # newline
-      assert response =~ "\\r"       # carriage return
+      # backslash
+      assert response =~ "\\\\\\\\"
+      # newline
+      assert response =~ "\\n"
+      # carriage return
+      assert response =~ "\\r"
     end
 
     test "preserves normal characters" do

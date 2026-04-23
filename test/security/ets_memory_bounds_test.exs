@@ -26,9 +26,10 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
       assert length(metrics) == limit
 
       # Attempt to exceed the limit
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter("test.cardinality", 1, %{unique_id: "id_overflow"})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter("test.cardinality", 1, %{unique_id: "id_overflow"})
+        end)
 
       # Should log a warning about cardinality limit
       assert log =~ "Metric cardinality limit exceeded"
@@ -45,14 +46,16 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
 
       # Fill up the cardinality to the limit
       limit = ObservLib.Config.cardinality_limit()
+
       for i <- 2..limit do
         ObservLib.Metrics.counter("test.update", 1, %{id: "id_#{i}"})
       end
 
       # Updating an existing variant should still work
-      log = capture_log(fn ->
-        ObservLib.Metrics.counter("test.update", 5, %{id: "existing"})
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Metrics.counter("test.update", 5, %{id: "existing"})
+        end)
 
       refute log =~ "Metric cardinality limit exceeded"
 
@@ -90,21 +93,23 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
       batch_limit = ObservLib.Config.get_log_batch_limit()
 
       # Create more log records than the limit
-      excessive_logs = for i <- 1..(batch_limit + 100) do
-        %{
-          level: :info,
-          message: "Test log #{i}",
-          timestamp: System.system_time(:nanosecond),
-          attributes: %{}
-        }
-      end
+      excessive_logs =
+        for i <- 1..(batch_limit + 100) do
+          %{
+            level: :info,
+            message: "Test log #{i}",
+            timestamp: System.system_time(:nanosecond),
+            attributes: %{}
+          }
+        end
 
       # Add logs to batch
-      log = capture_log(fn ->
-        ObservLib.Exporters.OtlpLogsExporter.add_to_batch(excessive_logs)
-        # Give it a moment to process
-        Process.sleep(100)
-      end)
+      log =
+        capture_log(fn ->
+          ObservLib.Exporters.OtlpLogsExporter.add_to_batch(excessive_logs)
+          # Give it a moment to process
+          Process.sleep(100)
+        end)
 
       # Should log a warning about batch limit
       assert log =~ "Log batch limit exceeded"
@@ -115,9 +120,10 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
   describe "sec-010: Span limits prevent unbounded active spans" do
     test "active span tracking does not grow unbounded" do
       # Start many spans
-      spans = for i <- 1..100 do
-        ObservLib.Traces.Provider.start_span("test_span_#{i}", %{index: i})
-      end
+      spans =
+        for i <- 1..100 do
+          ObservLib.Traces.Provider.start_span("test_span_#{i}", %{index: i})
+        end
 
       # Verify spans are tracked
       active_count = ObservLib.Traces.Provider.active_span_count()

@@ -434,7 +434,7 @@ defmodule ObservLib.LogsTest do
               user_id: 123,
               session_token: "abc-def-ghi",
               is_authenticated: true,
-              request_time: 1234567890.123
+              request_time: 1_234_567_890.123
             },
             fn ->
               ObservLib.Logs.info("Complex context test")

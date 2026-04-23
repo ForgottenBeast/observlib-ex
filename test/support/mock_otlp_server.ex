@@ -117,11 +117,11 @@ defmodule ObservLib.Test.MockOtlpServer do
     response_mode = Keyword.get(opts, :response_mode, :success)
 
     case :gen_tcp.listen(port, [
-      :binary,
-      packet: :http_bin,
-      active: false,
-      reuseaddr: true
-    ]) do
+           :binary,
+           packet: :http_bin,
+           active: false,
+           reuseaddr: true
+         ]) do
       {:ok, listen_socket} ->
         # Get the actual port if we requested 0
         {:ok, actual_port} = :inet.port(listen_socket)
@@ -216,6 +216,7 @@ defmodule ObservLib.Test.MockOtlpServer do
     if state.listen_socket do
       :gen_tcp.close(state.listen_socket)
     end
+
     :ok
   end
 
@@ -327,19 +328,28 @@ defmodule ObservLib.Test.MockOtlpServer do
 
   defp send_response(socket, 405) do
     body = "Method Not Allowed"
-    response = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
+    response =
+      "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
     :gen_tcp.send(socket, response)
   end
 
   defp send_response(socket, 500) do
     body = "Internal Server Error"
-    response = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
+    response =
+      "HTTP/1.1 500 Internal Server Error\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
     :gen_tcp.send(socket, response)
   end
 
   defp send_response(socket, 503) do
     body = "Service Unavailable"
-    response = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
+    response =
+      "HTTP/1.1 503 Service Unavailable\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+
     :gen_tcp.send(socket, response)
   end
 

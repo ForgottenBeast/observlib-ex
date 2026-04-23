@@ -235,6 +235,7 @@ defmodule ObservLib.TelemetryTest do
     test "returns empty list when no ObservLib handlers attached" do
       # Detach any handlers that might have been left from other tests
       handlers_before = ObservLib.Telemetry.list_handlers()
+
       Enum.each(handlers_before, fn %{id: id} ->
         :telemetry.detach(id)
       end)

@@ -8,12 +8,19 @@ defmodule ObservLib.AttributesRedactionTest do
 
   alias ObservLib.Attributes
 
+  # Restarts the supervised Config GenServer so it picks up new Application env.
+  defp restart_config do
+    Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
+    {:ok, _} = Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
+    :ok
+  end
+
   setup do
     # Store original config
     original_config = Application.get_all_env(:observlib)
 
     on_exit(fn ->
-      # Restore original config
+      # Restore original config then restart Config to pick it up
       for {key, _} <- Application.get_all_env(:observlib) do
         Application.delete_env(:observlib, key)
       end
@@ -22,22 +29,13 @@ defmodule ObservLib.AttributesRedactionTest do
         Application.put_env(:observlib, key, value)
       end
 
-      # Restart Config to pick up original settings
-      if pid = Process.whereis(ObservLib.Config) do
-        GenServer.stop(pid)
-        {:ok, _} = ObservLib.Config.start_link([])
-      end
+      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
+      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
     end)
 
-    # Start Config with test settings
-    if pid = Process.whereis(ObservLib.Config) do
-      GenServer.stop(pid)
-    end
-
+    # Set env BEFORE restarting Config so it reads the new values
     Application.put_env(:observlib, :service_name, "test-service")
-    {:ok, _} = ObservLib.Config.start_link([])
-
-    :ok
+    restart_config()
   end
 
   describe "default redaction list" do
@@ -165,10 +163,8 @@ defmodule ObservLib.AttributesRedactionTest do
 
   describe "custom redaction list" do
     test "uses custom redaction list when configured" do
-      # Stop and reconfigure
-      GenServer.stop(ObservLib.Config)
       Application.put_env(:observlib, :redacted_attribute_keys, ["custom_key"])
-      {:ok, _} = ObservLib.Config.start_link([])
+      restart_config()
 
       # Custom key is redacted
       {:ok, result} = Attributes.validate(%{"custom_key" => "value"})
@@ -180,10 +176,8 @@ defmodule ObservLib.AttributesRedactionTest do
     end
 
     test "disables redaction with empty list" do
-      # Stop and reconfigure
-      GenServer.stop(ObservLib.Config)
       Application.put_env(:observlib, :redacted_attribute_keys, [])
-      {:ok, _} = ObservLib.Config.start_link([])
+      restart_config()
 
       # No redaction when list is empty
       {:ok, result} = Attributes.validate(%{"password" => "secret123"})
@@ -196,10 +190,8 @@ defmodule ObservLib.AttributesRedactionTest do
 
   describe "custom redaction pattern" do
     test "uses custom redaction pattern" do
-      # Stop and reconfigure
-      GenServer.stop(ObservLib.Config)
       Application.put_env(:observlib, :redaction_pattern, "***HIDDEN***")
-      {:ok, _} = ObservLib.Config.start_link([])
+      restart_config()
 
       {:ok, result} = Attributes.validate(%{"password" => "secret123"})
       assert result["password"] == "***HIDDEN***"

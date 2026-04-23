@@ -21,7 +21,7 @@ defmodule ObservLib.Security.TlsValidationTest do
 
       assert :"tlsv1.3" in tls_versions or :"tlsv1.2" in tls_versions
       refute :"tlsv1.1" in tls_versions
-      refute :"tlsv1" in tls_versions
+      refute :tlsv1 in tls_versions
       refute :sslv3 in tls_versions
     end
 
@@ -49,34 +49,38 @@ defmodule ObservLib.Security.TlsValidationTest do
     end
 
     test "HTTP to localhost does not trigger TLS warnings" do
-      log = capture_log(fn ->
-        HTTP.post("http://localhost:4318/v1/traces", json: %{})
-      end)
+      log =
+        capture_log(fn ->
+          HTTP.post("http://localhost:4318/v1/traces", json: %{})
+        end)
 
       refute log =~ "Plaintext HTTP connection to remote host"
     end
 
     test "HTTP to 127.0.0.1 does not trigger TLS warnings" do
-      log = capture_log(fn ->
-        HTTP.post("http://127.0.0.1:4318/v1/traces", json: %{})
-      end)
+      log =
+        capture_log(fn ->
+          HTTP.post("http://127.0.0.1:4318/v1/traces", json: %{})
+        end)
 
       refute log =~ "Plaintext HTTP connection to remote host"
     end
 
     test "HTTP to remote host triggers security warning" do
-      log = capture_log(fn ->
-        HTTP.post("http://remote-collector.example.com/v1/traces", json: %{})
-      end)
+      log =
+        capture_log(fn ->
+          HTTP.post("http://remote-collector.example.com/v1/traces", json: %{})
+        end)
 
       assert log =~ "Plaintext HTTP connection to remote host"
       assert log =~ "Consider using HTTPS"
     end
 
     test "HTTP to IPv6 localhost does not trigger warnings" do
-      log = capture_log(fn ->
-        HTTP.post("http://[::1]:4318/v1/traces", json: %{})
-      end)
+      log =
+        capture_log(fn ->
+          HTTP.post("http://[::1]:4318/v1/traces", json: %{})
+        end)
 
       refute log =~ "Plaintext HTTP connection to remote host"
     end

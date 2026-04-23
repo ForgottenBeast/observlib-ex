@@ -19,10 +19,11 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "starts in enabled mode when endpoint provided" do
-      {:ok, pid} = Client.start_link(
-        name: :test_pyroscope_enabled,
-        endpoint: "http://localhost:4040"
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_pyroscope_enabled,
+          endpoint: "http://localhost:4040"
+        )
 
       assert Process.alive?(pid)
 
@@ -34,11 +35,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "uses custom sample rate when provided" do
-      {:ok, pid} = Client.start_link(
-        name: :test_pyroscope_sample_rate,
-        endpoint: "http://localhost:4040",
-        sample_rate: 10000
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_pyroscope_sample_rate,
+          endpoint: "http://localhost:4040",
+          sample_rate: 10000
+        )
 
       status = GenServer.call(pid, :get_status)
       assert status.sample_rate == 10000
@@ -47,11 +49,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "uses custom labels when provided" do
-      {:ok, pid} = Client.start_link(
-        name: :test_pyroscope_labels,
-        endpoint: "http://localhost:4040",
-        labels: %{"env" => "test", "version" => "1.0"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_pyroscope_labels,
+          endpoint: "http://localhost:4040",
+          labels: %{"env" => "test", "version" => "1.0"}
+        )
 
       status = GenServer.call(pid, :get_status)
       assert status.labels["env"] == "test"
@@ -63,11 +66,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "add_labels/1" do
     test "adds labels to existing labels" do
-      {:ok, pid} = Client.start_link(
-        name: :test_add_labels,
-        endpoint: "http://localhost:4040",
-        labels: %{"existing" => "value"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_add_labels,
+          endpoint: "http://localhost:4040",
+          labels: %{"existing" => "value"}
+        )
 
       :ok = GenServer.call(pid, {:add_labels, %{"new_label" => "new_value"}})
 
@@ -79,11 +83,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "overwrites existing labels with same key" do
-      {:ok, pid} = Client.start_link(
-        name: :test_overwrite_labels,
-        endpoint: "http://localhost:4040",
-        labels: %{"key" => "old_value"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_overwrite_labels,
+          endpoint: "http://localhost:4040",
+          labels: %{"key" => "old_value"}
+        )
 
       :ok = GenServer.call(pid, {:add_labels, %{"key" => "new_value"}})
 
@@ -96,11 +101,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "remove_labels/1" do
     test "removes specified labels" do
-      {:ok, pid} = Client.start_link(
-        name: :test_remove_labels,
-        endpoint: "http://localhost:4040",
-        labels: %{"keep" => "value1", "remove" => "value2"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_remove_labels,
+          endpoint: "http://localhost:4040",
+          labels: %{"keep" => "value1", "remove" => "value2"}
+        )
 
       :ok = GenServer.call(pid, {:remove_labels, ["remove"]})
 
@@ -112,11 +118,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "handles removing non-existent labels gracefully" do
-      {:ok, pid} = Client.start_link(
-        name: :test_remove_nonexistent,
-        endpoint: "http://localhost:4040",
-        labels: %{"existing" => "value"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_remove_nonexistent,
+          endpoint: "http://localhost:4040",
+          labels: %{"existing" => "value"}
+        )
 
       :ok = GenServer.call(pid, {:remove_labels, ["nonexistent"]})
 
@@ -129,12 +136,13 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "get_status/0" do
     test "returns complete status information" do
-      {:ok, pid} = Client.start_link(
-        name: :test_get_status,
-        endpoint: "http://localhost:4040",
-        sample_rate: 5000,
-        labels: %{"test" => "value"}
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_get_status,
+          endpoint: "http://localhost:4040",
+          sample_rate: 5000,
+          labels: %{"test" => "value"}
+        )
 
       status = GenServer.call(pid, :get_status)
 
@@ -150,10 +158,11 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "tracks upload and error counts" do
-      {:ok, pid} = Client.start_link(
-        name: :test_status_counts,
-        endpoint: "http://localhost:4040"
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_status_counts,
+          endpoint: "http://localhost:4040"
+        )
 
       status = GenServer.call(pid, :get_status)
       assert status.upload_count == 0
@@ -176,10 +185,11 @@ defmodule ObservLib.Pyroscope.ClientTest do
     test "attempts upload when enabled" do
       # Note: This will fail to actually upload without a real Pyroscope server
       # but we test that it attempts the operation
-      {:ok, pid} = Client.start_link(
-        name: :test_force_flush_enabled,
-        endpoint: "http://localhost:4040"
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_force_flush_enabled,
+          endpoint: "http://localhost:4040"
+        )
 
       # The force_flush will fail because there's no server, but it should
       # increment the error count
@@ -206,11 +216,13 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "periodic collection" do
     test "schedules collection when enabled" do
-      {:ok, pid} = Client.start_link(
-        name: :test_periodic_collection,
-        endpoint: "http://localhost:4040",
-        sample_rate: 100  # Short interval for testing
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_periodic_collection,
+          endpoint: "http://localhost:4040",
+          # Short interval for testing
+          sample_rate: 100
+        )
 
       # Wait for at least one collection attempt
       Process.sleep(150)
@@ -223,10 +235,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     end
 
     test "does not schedule collection when disabled" do
-      {:ok, pid} = Client.start_link(
-        name: :test_no_collection,
-        sample_rate: 100  # Short interval
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_no_collection,
+          # Short interval
+          sample_rate: 100
+        )
 
       Process.sleep(150)
 
@@ -243,11 +257,12 @@ defmodule ObservLib.Pyroscope.ClientTest do
     test "collects stack traces from processes" do
       # This is an internal test - we verify the client can collect samples
       # by checking it doesn't crash during collection
-      {:ok, pid} = Client.start_link(
-        name: :test_stack_sampling,
-        endpoint: "http://localhost:4040",
-        sample_rate: 50
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_stack_sampling,
+          endpoint: "http://localhost:4040",
+          sample_rate: 50
+        )
 
       # Give it time to collect a sample
       Process.sleep(100)
@@ -261,11 +276,13 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "graceful degradation" do
     test "continues operating when Pyroscope is unreachable" do
-      {:ok, pid} = Client.start_link(
-        name: :test_graceful_degradation,
-        endpoint: "http://localhost:9999",  # Non-existent server
-        sample_rate: 50
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_graceful_degradation,
+          # Non-existent server
+          endpoint: "http://localhost:9999",
+          sample_rate: 50
+        )
 
       # Let it attempt several uploads
       Process.sleep(200)
@@ -283,10 +300,11 @@ defmodule ObservLib.Pyroscope.ClientTest do
 
   describe "trace context correlation" do
     test "logs within a span include trace context" do
-      {:ok, pid} = Client.start_link(
-        name: :test_trace_context,
-        endpoint: "http://localhost:4040"
-      )
+      {:ok, pid} =
+        Client.start_link(
+          name: :test_trace_context,
+          endpoint: "http://localhost:4040"
+        )
 
       # Create a span and check that the client can read trace context
       ObservLib.Traces.with_span("test_span", %{}, fn ->

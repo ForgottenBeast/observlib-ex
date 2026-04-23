@@ -98,6 +98,7 @@ defmodule ObservLib.ConfigTest do
 
     test "resource merges user-provided attributes" do
       Application.put_env(:observlib, :service_name, "my-service")
+
       Application.put_env(:observlib, :resource_attributes, %{
         "deployment.environment" => "production",
         "service.version" => "1.0.0"
@@ -116,6 +117,7 @@ defmodule ObservLib.ConfigTest do
 
     test "user attributes do not override service.name" do
       Application.put_env(:observlib, :service_name, "my-service")
+
       Application.put_env(:observlib, :resource_attributes, %{
         "service.name" => "override-attempt"
       })
@@ -147,14 +149,16 @@ defmodule ObservLib.ConfigTest do
 
   describe "property-based tests" do
     property "resource always contains service.name key" do
-      check all service_name <- string(:printable, min_length: 1),
-                attr_count <- integer(0..10),
-                user_attrs <- map_of(
+      check all(
+              service_name <- string(:printable, min_length: 1),
+              attr_count <- integer(0..10),
+              user_attrs <-
+                map_of(
                   string(:printable, min_length: 1),
                   string(:printable),
                   length: attr_count
-                ) do
-
+                )
+            ) do
         Application.put_env(:observlib, :service_name, service_name)
         Application.put_env(:observlib, :resource_attributes, user_attrs)
 
