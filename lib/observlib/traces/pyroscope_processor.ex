@@ -220,7 +220,7 @@ defmodule ObservLib.Traces.PyroscopeProcessor do
       nil ->
         %{}
 
-      span_ctx when is_tuple(span_ctx) ->
+      span_ctx when is_tuple(span_ctx) and tuple_size(span_ctx) == 8 ->
         try do
           # Extract trace_id and span_id for Pyroscope correlation
           {_, trace_id, span_id, _, _, _, _, _} = span_ctx

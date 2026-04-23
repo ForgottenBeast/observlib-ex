@@ -76,18 +76,20 @@ defmodule ObservLib.Security.TelemetryRedactionTest do
     end
 
     test "redacts 'authorization' key" do
-      {:ok, sanitized} = ObservLib.Attributes.validate(%{"authorization" => "Bearer secret_token"})
+      {:ok, sanitized} =
+        ObservLib.Attributes.validate(%{"authorization" => "Bearer secret_token"})
 
       assert sanitized["authorization"] == "[REDACTED]"
     end
 
     test "redacts keys via case-insensitive substring match" do
       # Should redact any key containing 'password' as substring
-      {:ok, sanitized} = ObservLib.Attributes.validate(%{
-        "user_password" => "secret",
-        "PASSWORD" => "also_secret",
-        "DB_PASSWORD_HASH" => "hashed"
-      })
+      {:ok, sanitized} =
+        ObservLib.Attributes.validate(%{
+          "user_password" => "secret",
+          "PASSWORD" => "also_secret",
+          "DB_PASSWORD_HASH" => "hashed"
+        })
 
       assert sanitized["user_password"] == "[REDACTED]"
       assert sanitized["PASSWORD"] == "[REDACTED]"
@@ -95,12 +97,13 @@ defmodule ObservLib.Security.TelemetryRedactionTest do
     end
 
     test "non-sensitive attributes pass through unchanged" do
-      {:ok, sanitized} = ObservLib.Attributes.validate(%{
-        "http.method" => "GET",
-        "http.status_code" => "200",
-        "user.id" => "usr_123",
-        "duration_ms" => "45"
-      })
+      {:ok, sanitized} =
+        ObservLib.Attributes.validate(%{
+          "http.method" => "GET",
+          "http.status_code" => "200",
+          "user.id" => "usr_123",
+          "duration_ms" => "45"
+        })
 
       assert sanitized["http.method"] == "GET"
       assert sanitized["http.status_code"] == "200"
@@ -138,7 +141,8 @@ defmodule ObservLib.Security.TelemetryRedactionTest do
       # Step 1: What handle_event/4 currently does (vulnerable path)
       vulnerable_attributes =
         raw_metadata
-        |> Map.take(Map.keys(raw_metadata))  # identity operation — takes all keys
+        # identity operation — takes all keys
+        |> Map.take(Map.keys(raw_metadata))
         |> Enum.reduce(%{}, fn {k, v}, acc ->
           key = if is_atom(k), do: Atom.to_string(k), else: to_string(k)
           Map.put(acc, key, v)
@@ -154,6 +158,7 @@ defmodule ObservLib.Security.TelemetryRedactionTest do
       # Remediated: password and token are redacted
       assert safe_attributes["password"] == "[REDACTED]",
              "After validate/1, password must be redacted"
+
       assert safe_attributes["token"] == "[REDACTED]",
              "After validate/1, token must be redacted"
 

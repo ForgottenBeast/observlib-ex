@@ -335,9 +335,6 @@ defmodule ObservLib.Logs.Backend.Handler do
   @moduledoc false
   # Erlang :logger handler module for ObservLib.Logs.Backend
 
-  @behaviour :logger_handler
-
-  @impl true
   def log(%{level: level, msg: msg, meta: meta}, _config) do
     # Convert message to string
     message =
@@ -392,19 +389,16 @@ defmodule ObservLib.Logs.Backend.Handler do
     :ok
   end
 
-  @impl true
   def adding_handler(config) do
     # OTP 28+ requires :level key in returned config
     level = Map.get(config, :level, :all)
     {:ok, %{level: level}}
   end
 
-  @impl true
   def removing_handler(_config) do
     :ok
   end
 
-  @impl true
   def changing_config(_action, _old_config, new_config) do
     {:ok, new_config}
   end
