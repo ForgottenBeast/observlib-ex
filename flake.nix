@@ -17,8 +17,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # Elixir version (can be changed to elixir_1_16, elixir_1_15, etc.)
-        beamPackages = pkgs.beam.packages.erlang;
+        # Pin to OTP 27: OTP 28 changed logger.filter_config/1 in a way that
+        # breaks ExUnit.CaptureLog (Logger.flush/0 passes level: :all which
+        # OTP 28 kernel 10.x rejects). Use erlang_27 for a stable test environment.
+        beamPackages = pkgs.beam.packages.erlang_27;
         inherit (beamPackages) elixir;
 
         # Build Elixir application using mix2nix
@@ -124,9 +126,9 @@
         # Development shell with Elixir tools
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            # Elixir and Erlang
+            # Elixir and Erlang (use beamPackages to keep OTP version consistent)
             elixir
-            erlang
+            beamPackages.erlang
 
             # mix2nix for generating mix.nix
             mix2nix
