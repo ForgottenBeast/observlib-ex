@@ -36,7 +36,7 @@ defmodule ObservLib.MixProject do
       {:opentelemetry_exporter, "~> 1.6"},
       {:opentelemetry_telemetry, "~> 1.0"},
       {:telemetry, "~> 1.2"},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:req, "~> 0.4"},

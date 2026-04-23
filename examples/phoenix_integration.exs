@@ -57,13 +57,14 @@ defmodule MyApp.Telemetry do
   def metrics do
     [
       # Phoenix Metrics
-      summary("phoenix.endpoint.start.system_time",
+      # Note: summary/2 was removed in telemetry_metrics 1.0; distribution/2 is the replacement
+      distribution("phoenix.endpoint.start.system_time",
         unit: {:native, :millisecond}
       ),
-      summary("phoenix.endpoint.stop.duration",
+      distribution("phoenix.endpoint.stop.duration",
         unit: {:native, :millisecond}
       ),
-      summary("phoenix.router_dispatch.stop.duration",
+      distribution("phoenix.router_dispatch.stop.duration",
         tags: [:route],
         unit: {:native, :millisecond}
       ),
