@@ -193,7 +193,7 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
     case Application.get_env(:observlib, :otlp_traces_endpoint) ||
            Application.get_env(:observlib, :otlp_endpoint) do
       nil ->
-        @default_endpoint
+        append_traces_path(@default_endpoint)
 
       traces_endpoint when is_binary(traces_endpoint) ->
         # Only append /v1/traces if this came from the general otlp_endpoint
@@ -242,11 +242,11 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
   end
 
   defp get_batch_size do
-    Application.get_env(:observlib, :batch_size, @default_batch_size)
+    Application.get_env(:observlib, :otlp_batch_size, @default_batch_size)
   end
 
   defp get_batch_timeout do
-    Application.get_env(:observlib, :batch_timeout, @default_batch_timeout)
+    Application.get_env(:observlib, :otlp_batch_timeout, @default_batch_timeout)
   end
 
   defp get_max_queue_size do

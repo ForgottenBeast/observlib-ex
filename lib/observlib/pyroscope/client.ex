@@ -363,12 +363,20 @@ defmodule ObservLib.Pyroscope.Client do
   defp format_process_name(name) when is_atom(name), do: Atom.to_string(name)
   defp format_process_name(name), do: inspect(name)
 
-  defp format_stack_frame({module, function, arity, _location}) do
+  defp format_stack_frame({module, function, arity, _location}) when is_integer(arity) do
     "#{module}.#{function}/#{arity}"
   end
 
-  defp format_stack_frame({module, function, arity}) do
+  defp format_stack_frame({module, function, args, _location}) when is_list(args) do
+    "#{module}.#{function}/#{length(args)}"
+  end
+
+  defp format_stack_frame({module, function, arity}) when is_integer(arity) do
     "#{module}.#{function}/#{arity}"
+  end
+
+  defp format_stack_frame({module, function, args}) when is_list(args) do
+    "#{module}.#{function}/#{length(args)}"
   end
 
   defp format_stack_frame(other) do

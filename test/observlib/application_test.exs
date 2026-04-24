@@ -23,8 +23,8 @@ defmodule ObservLib.ApplicationTest do
       # We can verify by checking that it returns expected result
       case ObservLib.Config.get_otlp_endpoint() do
         nil ->
-          # Expected behavior: setup returns error when no endpoint
-          assert {:error, _} = OtlpTraceExporter.setup()
+          # setup/0 uses a default endpoint (localhost:4318) when none is configured
+          assert :ok = OtlpTraceExporter.setup()
 
         _endpoint ->
           # If endpoint is configured, setup should succeed

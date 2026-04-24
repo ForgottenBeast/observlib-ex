@@ -1,5 +1,5 @@
 defmodule ObservLib.Security.ResourceLimitsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   use ExUnitProperties
 
   import ExUnit.CaptureLog
