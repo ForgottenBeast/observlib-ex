@@ -1,3 +1,4 @@
+.obs_ex
 # The directory Mix will write compiled artifacts to.
 .nix-hex
 .nix-mix
