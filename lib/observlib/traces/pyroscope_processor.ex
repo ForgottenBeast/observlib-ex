@@ -198,7 +198,8 @@ defmodule ObservLib.Traces.PyroscopeProcessor do
 
   defp get_pyroscope_endpoint do
     try do
-      ObservLib.Config.get_pyroscope_endpoint()
+      ObservLib.Config.get_pyroscope_endpoint() ||
+        Application.get_env(:observlib, :pyroscope_endpoint)
     catch
       :exit, _ ->
         Application.get_env(:observlib, :pyroscope_endpoint)

@@ -570,7 +570,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
           9 -> "\\t"
           # Null byte
           0 -> "\\x00"
-          _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16), 2, "0")
+          _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16) |> String.downcase(), 2, "0")
         end
 
       char ->

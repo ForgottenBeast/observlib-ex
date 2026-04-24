@@ -450,8 +450,8 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
       :gen_tcp.close(socket)
 
       # All special characters should be escaped
-      # backslash
-      assert response =~ "\\\\\\\\"
+      # backslash (one backslash in input becomes \\ in Prometheus output)
+      assert response =~ "\\\\"
       # newline
       assert response =~ "\\n"
       # carriage return
@@ -459,7 +459,7 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
     end
 
     test "preserves normal characters" do
-      MeterProvider.record("test_metric", :counter, 1, %{normal: "hello_world123"})
+      MeterProvider.record("test_metric_normal", :counter, 1, %{label: "hello_world123"})
       Process.sleep(20)
 
       {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
