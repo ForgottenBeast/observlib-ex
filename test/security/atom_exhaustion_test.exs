@@ -74,8 +74,8 @@ defmodule ObservLib.Security.AtomExhaustionTest do
 
     test "handler_id/1 rejects non-atom elements" do
       assert_raise ArgumentError, ~r/requires a list of atoms/, fn ->
-        # This will fail because handler_id/1 validates input
-        send(ObservLib.Telemetry, {:attach, ["string", "prefix"], []})
+        # Calling attach/1 with non-atom elements triggers handler_id/1 validation
+        ObservLib.Telemetry.attach(["string", "prefix"])
       end
     end
 

@@ -39,20 +39,18 @@ defmodule ObservLib.Attributes do
     max_size = ObservLib.Config.get(:max_attribute_value_size, 4096)
     max_count = ObservLib.Config.get(:max_attribute_count, 128)
 
-    cond do
-      map_size(attributes) > max_count ->
-        # Truncate to first max_count attributes
-        truncated = attributes |> Enum.take(max_count) |> Map.new()
+    if map_size(attributes) > max_count do
+      # Truncate to first max_count attributes
+      truncated = attributes |> Enum.take(max_count) |> Map.new()
+      count = map_size(attributes)
 
-        Logger.warning("Attribute count exceeded",
-          limit: max_count,
-          count: map_size(attributes)
-        )
+      Logger.warning(
+        "Attribute count exceeded, limit: #{max_count}, count: #{count}"
+      )
 
-        {:ok, truncated |> truncate_values(max_size) |> redact_sensitive()}
-
-      true ->
-        {:ok, attributes |> truncate_values(max_size) |> redact_sensitive()}
+      {:ok, truncated |> truncate_values(max_size) |> redact_sensitive()}
+    else
+      {:ok, attributes |> truncate_values(max_size) |> redact_sensitive()}
     end
   end
 
@@ -125,9 +123,8 @@ defmodule ObservLib.Attributes do
       suffix = "...[TRUNC]"
       truncate_length = max_size - byte_size(suffix)
 
-      Logger.warning("Attribute value truncated",
-        original_size: byte_size(value),
-        truncated_size: max_size
+      Logger.warning(
+        "Attribute value truncated, original_size: #{byte_size(value)}, truncated_size: #{max_size}"
       )
 
       <<truncated::binary-size(truncate_length), _::binary>> = value

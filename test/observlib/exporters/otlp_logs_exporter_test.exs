@@ -311,8 +311,10 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
   end
 
   describe "error handling" do
-    test "handles export errors gracefully", %{exporter_pid: _pid} do
-      # Create a log record that will be sent to non-existent collector
+    test "handles export errors gracefully when retries exhausted" do
+      # Start exporter with no retries so errors surface immediately
+      {:ok, pid} = OtlpLogsExporter.start_link(name: GracefulErrorExporter, max_retries: 0)
+
       log_record = %{
         level: :error,
         message: "Error test",
@@ -320,9 +322,11 @@ defmodule ObservLib.Exporters.OtlpLogsExporterTest do
         attributes: %{}
       }
 
-      # Should return error but not crash
-      result = OtlpLogsExporter.export([log_record])
+      # Should return error but not crash (max_retries: 0 disables retry scheduling)
+      result = GenServer.call(GracefulErrorExporter, {:export, [log_record]})
       assert match?({:error, _}, result)
+
+      GenServer.stop(pid)
     end
 
     test "continues operating after export failure" do

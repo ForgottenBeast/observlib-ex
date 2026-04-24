@@ -175,9 +175,10 @@ defmodule ObservLib.HTTP do
 
   defp ssrf_target?(host) do
     host_lower = String.downcase(host)
+
     # Block link-local addresses (169.254.x.x) used by cloud metadata services
+    # Block .internal hostnames (e.g. metadata.google.internal)
     String.starts_with?(host_lower, "169.254.") or
-      # Block .internal hostnames (e.g. metadata.google.internal)
       String.ends_with?(host_lower, ".internal")
   end
 

@@ -181,8 +181,10 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
       :ok ->
         {:reply, :ok, state}
 
-      {:retry, _retry_count} ->
-        {:reply, {:error, :connection_failed}, state}
+      {:retry, retry_count} ->
+        retry_delay = calculate_retry_delay(retry_count)
+        Process.send_after(self(), {:retry_export, log_records}, retry_delay)
+        {:reply, :ok, %{state | retry_count: retry_count}}
 
       {:error, reason} = error ->
         safe_reason = ObservLib.HTTP.redact_sensitive_headers(reason)
@@ -206,9 +208,8 @@ defmodule ObservLib.Exporters.OtlpLogsExporter do
       if length(new_batch) > state.batch_limit do
         dropped_count = length(new_batch) - state.batch_limit
 
-        Logger.warning("Log batch limit exceeded, dropping oldest logs",
-          limit: state.batch_limit,
-          dropped: dropped_count
+        Logger.warning(
+          "Log batch limit exceeded, dropping oldest logs (dropped: #{dropped_count}, limit: #{state.batch_limit})"
         )
 
         Enum.take(new_batch, state.batch_limit)
