@@ -78,8 +78,11 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
 
   @impl true
   def init(opts) do
-    # Get configuration - allow endpoint override via opts for testing
-    endpoint = Keyword.get(opts, :endpoint) || ObservLib.Config.get_otlp_endpoint()
+    endpoint =
+      case Keyword.fetch(opts, :endpoint) do
+        {:ok, ep} -> ep
+        :error -> ObservLib.Config.get_otlp_endpoint()
+      end
 
     if is_nil(endpoint) do
       Logger.warning("OTLP endpoint not configured, metrics exporter disabled")

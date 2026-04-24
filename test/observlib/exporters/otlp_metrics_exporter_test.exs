@@ -3,26 +3,27 @@ defmodule ObservLib.Exporters.OtlpMetricsExporterTest do
 
   alias ObservLib.Exporters.OtlpMetricsExporter
 
-  setup do
-    # Configure test endpoint before restarting Config
+  setup_all do
     Application.put_env(:observlib, :otlp_endpoint, "http://localhost:4318")
     Application.put_env(:observlib, :service_name, "test_service")
 
-    # Restart Config so it picks up the new environment variables
     Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-    Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
+    {:ok, _} = Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
 
-    # Reset MeterProvider so get_stats falls back to internal exporter metrics
+    on_exit(fn ->
+      Application.put_env(:observlib, :service_name, "observlib_test")
+      Application.delete_env(:observlib, :otlp_endpoint)
+      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
+      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
+    end)
+
+    :ok
+  end
+
+  setup do
     ObservLib.Metrics.MeterProvider.reset()
 
     on_exit(fn ->
-      # Restore original service_name and remove test endpoint
-      Application.put_env(:observlib, :service_name, "observlib_test")
-      Application.delete_env(:observlib, :otlp_endpoint)
-      # Restart Config to restore original configuration
-      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
-      # Clean up any running exporters started by individual tests
       if pid = Process.whereis(OtlpMetricsExporter) do
         try do
           GenServer.stop(pid, :normal, 1000)
@@ -57,22 +58,11 @@ defmodule ObservLib.Exporters.OtlpMetricsExporterTest do
     end
 
     test "starts disabled when no endpoint configured" do
-      Application.delete_env(:observlib, :otlp_endpoint)
-
-      # Restart Config to pick up change
-      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
-
-      assert {:ok, pid} = OtlpMetricsExporter.start_link()
+      assert {:ok, pid} = OtlpMetricsExporter.start_link(endpoint: nil)
       assert Process.alive?(pid)
 
       stats = OtlpMetricsExporter.get_stats()
       assert stats.enabled == false
-
-      # Restore endpoint
-      Application.put_env(:observlib, :otlp_endpoint, "http://localhost:4318")
-      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
     end
   end
 
@@ -356,20 +346,9 @@ defmodule ObservLib.Exporters.OtlpMetricsExporterTest do
     end
 
     test "returns error when disabled" do
-      Application.delete_env(:observlib, :otlp_endpoint)
-
-      # Restart Config
-      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
-
-      start_supervised!(OtlpMetricsExporter)
+      start_supervised!({OtlpMetricsExporter, [endpoint: nil]})
 
       assert {:error, :disabled} = OtlpMetricsExporter.force_export()
-
-      # Restore endpoint
-      Application.put_env(:observlib, :otlp_endpoint, "http://localhost:4318")
-      Supervisor.terminate_child(ObservLib.Supervisor, ObservLib.Config)
-      Supervisor.restart_child(ObservLib.Supervisor, ObservLib.Config)
     end
 
     test "handles empty metrics gracefully" do

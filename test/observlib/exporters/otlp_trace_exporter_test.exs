@@ -141,6 +141,9 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
         Application.delete_env(:observlib, :otlp_traces_endpoint)
         Application.delete_env(:observlib, :otlp_protocol)
         Application.delete_env(:observlib, :otlp_compression)
+        Application.delete_env(:observlib, :otlp_batch_size)
+        Application.delete_env(:observlib, :otlp_batch_timeout)
+        Application.delete_env(:observlib, :otlp_max_queue_size)
 
         Enum.each(original_config, fn {key, value} ->
           Application.put_env(:observlib, key, value)
