@@ -161,6 +161,7 @@ defmodule ObservLib.Exporters.OtlpTraceExporter do
       {:error, e}
   end
 
+  @dialyzer {:nowarn_function, configure_exporter_app: 1}
   defp configure_exporter_app(config) do
     # Set protocol
     Application.put_env(:opentelemetry_exporter, :otlp_protocol, config.protocol)

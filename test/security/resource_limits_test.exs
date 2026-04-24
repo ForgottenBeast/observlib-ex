@@ -136,6 +136,9 @@ defmodule ObservLib.Security.ResourceLimitsTest do
         ObservLib.Metrics.counter("test.metric", 1, %{id: i})
       end
 
+      # Flush all for-loop casts before entering capture_log window
+      ObservLib.Metrics.MeterProvider.read("test.metric")
+
       # Exceeding should be rejected with warning
       log =
         capture_log(fn ->

@@ -225,7 +225,7 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
           unescaped_quotes =
             stripped
             |> String.replace(~r/\\./, "")
-            |> String.graphemes()
+            |> String.codepoints()
             |> Enum.count(&(&1 == "\""))
 
           assert rem(unescaped_quotes, 2) == 0,

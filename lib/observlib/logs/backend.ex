@@ -313,6 +313,7 @@ defmodule ObservLib.Logs.Backend do
   defp format_trace_id(_), do: nil
 
   # Format span_id as hex string (64-bit / 16 hex chars)
+  @dialyzer {:nowarn_function, format_span_id: 1}
   defp format_span_id(span_id) when is_integer(span_id) do
     span_id
     |> Integer.to_string(16)
@@ -421,13 +422,13 @@ defmodule ObservLib.Logs.Backend.Handler do
           context = %{}
 
           context =
-            if trace_id && trace_id != 0 do
+            if trace_id != 0 do
               Map.put(context, :trace_id, format_id(trace_id, 32))
             else
               context
             end
 
-          if span_id && span_id != 0 do
+          if span_id != 0 do
             Map.put(context, :span_id, format_id(span_id, 16))
           else
             context
