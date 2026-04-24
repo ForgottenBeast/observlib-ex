@@ -163,23 +163,6 @@ defmodule ObservLib.Metrics.PrometheusReader do
     end
   end
 
-  defp accept_connection(socket, state) do
-    case check_rate_limit(state.rate_limiter) do
-      {:ok, new_limiter} ->
-        server_pid = self()
-        spawn(fn -> handle_request(socket, server_pid, state.basic_auth) end)
-
-        {:noreply,
-         %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
-
-      {:rate_limited, new_limiter} ->
-        Logger.warning("Prometheus rate limit exceeded")
-        send_rate_limit_response(socket)
-        :gen_tcp.close(socket)
-        {:noreply, %{state | rate_limiter: new_limiter}}
-    end
-  end
-
   @impl true
   def handle_info({:connection_closed}, state) do
     {:noreply, %{state | active_connections: max(0, state.active_connections - 1)}}
@@ -212,7 +195,24 @@ defmodule ObservLib.Metrics.PrometheusReader do
     :ok
   end
 
-  # Private Functions - Accept Loop
+  # Private Functions
+
+  defp accept_connection(socket, state) do
+    case check_rate_limit(state.rate_limiter) do
+      {:ok, new_limiter} ->
+        server_pid = self()
+        spawn(fn -> handle_request(socket, server_pid, state.basic_auth) end)
+
+        {:noreply,
+         %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
+
+      {:rate_limited, new_limiter} ->
+        Logger.warning("Prometheus rate limit exceeded")
+        send_rate_limit_response(socket)
+        :gen_tcp.close(socket)
+        {:noreply, %{state | rate_limiter: new_limiter}}
+    end
+  end
 
   defp accept_loop(listen_socket, parent) do
     case :gen_tcp.accept(listen_socket) do
@@ -568,16 +568,24 @@ defmodule ObservLib.Metrics.PrometheusReader do
         # Escape control characters as \xHH (except already-escaped \n, \r, \t)
         case char do
           # \n (already handled)
-          10 -> "\\n"
+          10 ->
+            "\\n"
+
           # \r (already handled)
-          13 -> "\\r"
+          13 ->
+            "\\r"
+
           # \t (already handled)
-          9 -> "\\t"
+          9 ->
+            "\\t"
+
           # Null byte
-          0 -> "\\x00"
+          0 ->
+            "\\x00"
+
           _ ->
-          hex = String.downcase(Integer.to_string(char, 16))
-          "\\x" <> String.pad_leading(hex, 2, "0")
+            hex = String.downcase(Integer.to_string(char, 16))
+            "\\x" <> String.pad_leading(hex, 2, "0")
         end
 
       char ->
