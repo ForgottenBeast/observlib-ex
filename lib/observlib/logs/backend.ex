@@ -235,6 +235,7 @@ defmodule ObservLib.Logs.Backend do
     System.system_time(:nanosecond)
   end
 
+  @dialyzer {:nowarn_function, extract_trace_context: 0}
   defp extract_trace_context do
     # Try to get current span context from OpenTelemetry
     try do
@@ -280,6 +281,7 @@ defmodule ObservLib.Logs.Backend do
 
   # Extract trace_id from span context tuple
   # The span context is typically: {:span_ctx, TraceId, SpanId, TraceFlags, Tracestate, IsValid, IsRemote, IsRecording}
+  @dialyzer {:nowarn_function, extract_trace_id: 1}
   defp extract_trace_id(span_ctx) when is_tuple(span_ctx) do
     case tuple_size(span_ctx) do
       size when size >= 2 -> elem(span_ctx, 1)
@@ -290,6 +292,7 @@ defmodule ObservLib.Logs.Backend do
   defp extract_trace_id(_), do: nil
 
   # Extract span_id from span context tuple
+  @dialyzer {:nowarn_function, extract_span_id: 1}
   defp extract_span_id(span_ctx) when is_tuple(span_ctx) do
     case tuple_size(span_ctx) do
       size when size >= 3 -> elem(span_ctx, 2)

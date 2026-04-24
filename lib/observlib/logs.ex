@@ -128,8 +128,7 @@ defmodule ObservLib.Logs do
   def attach_logger_handler do
     handler_config = %{
       config: %{},
-      level: :all,
-      formatter: {Logger.Formatter, []}
+      level: :all
     }
 
     case :logger.add_handler(@handler_id, :logger_std_h, handler_config) do

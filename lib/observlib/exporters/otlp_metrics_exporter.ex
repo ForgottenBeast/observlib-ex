@@ -377,6 +377,7 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     }
   end
 
+  @dialyzer {:nowarn_function, aggregate_metric: 4}
   defp aggregate_metric(existing, metric_type, measurements, metadata) do
     new_data_point = build_data_point(metric_type, measurements, metadata)
 
@@ -621,16 +622,7 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
     # Count values in each bucket
     counts =
       Enum.reduce(bounds ++ [:infinity], [], fn boundary, acc ->
-        count =
-          case boundary do
-            :infinity ->
-              Enum.count(values, fn v -> v > List.last(bounds) end)
-
-            b ->
-              prev_bound = if acc == [], do: 0.0, else: Enum.at(bounds, length(acc) - 1)
-              Enum.count(values, fn v -> v > prev_bound and v <= b end)
-          end
-
+        count = count_in_bucket(boundary, acc, values, bounds)
         [to_string(count) | acc]
       end)
       |> Enum.reverse()
@@ -639,6 +631,16 @@ defmodule ObservLib.Exporters.OtlpMetricsExporter do
       bounds: bounds,
       counts: counts
     }
+  end
+
+  defp count_in_bucket(:infinity, _acc, values, bounds) do
+    last_bound = List.last(bounds)
+    Enum.count(values, fn v -> v > last_bound end)
+  end
+
+  defp count_in_bucket(b, acc, values, bounds) do
+    prev_bound = if acc == [], do: 0.0, else: Enum.at(bounds, length(acc) - 1)
+    Enum.count(values, fn v -> v > prev_bound and v <= b end)
   end
 
   defp map_to_attributes(map) when map == %{}, do: []

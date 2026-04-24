@@ -128,7 +128,6 @@ defmodule ObservLib.Telemetry do
     case :telemetry.attach(id, prefix, handler_fun, config) do
       :ok -> :ok
       {:error, :already_exists} -> {:error, :already_attached}
-      {:error, reason} -> {:error, reason}
     end
   end
 

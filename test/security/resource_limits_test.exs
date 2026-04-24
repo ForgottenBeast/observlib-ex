@@ -140,6 +140,8 @@ defmodule ObservLib.Security.ResourceLimitsTest do
       log =
         capture_log(fn ->
           ObservLib.Metrics.counter("test.metric", 1, %{id: 9999})
+          # Sync call to flush the async cast so the log is captured
+          ObservLib.Metrics.MeterProvider.read("test.metric")
         end)
 
       assert log =~ "Metric cardinality limit exceeded"

@@ -29,6 +29,8 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
       log =
         capture_log(fn ->
           ObservLib.Metrics.counter("test.cardinality", 1, %{unique_id: "id_overflow"})
+          # Sync call to flush the async cast so the log is captured
+          ObservLib.Metrics.MeterProvider.read("test.cardinality")
         end)
 
       # Should log a warning about cardinality limit
@@ -119,15 +121,17 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
 
   describe "sec-010: Span limits prevent unbounded active spans" do
     test "active span tracking does not grow unbounded" do
+      initial_count = ObservLib.Traces.Provider.active_span_count()
+
       # Start many spans
       spans =
         for i <- 1..100 do
           ObservLib.Traces.Provider.start_span("test_span_#{i}", %{index: i})
         end
 
-      # Verify spans are tracked
+      # Verify spans are tracked (active_span_count is a call, so all prior casts are processed)
       active_count = ObservLib.Traces.Provider.active_span_count()
-      assert active_count == 100
+      assert active_count == initial_count + 100
 
       # End spans
       Enum.each(spans, fn span ->

@@ -31,7 +31,7 @@ defmodule ObservLib.TelemetryTest do
 
       handlers = ObservLib.Telemetry.list_handlers()
       handler_ids = Enum.map(handlers, & &1.id)
-      expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+      expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
       assert expected_id in handler_ids
     end
 
@@ -61,7 +61,7 @@ defmodule ObservLib.TelemetryTest do
 
       handlers = ObservLib.Telemetry.list_handlers()
       handler_ids = Enum.map(handlers, & &1.id)
-      expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+      expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
       assert expected_id in handler_ids
     end
 
@@ -84,7 +84,7 @@ defmodule ObservLib.TelemetryTest do
       handler_ids = Enum.map(handlers, & &1.id)
 
       for prefix <- [prefix1, prefix2] do
-        expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+        expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
         assert expected_id in handler_ids
       end
     end
@@ -182,7 +182,7 @@ defmodule ObservLib.TelemetryTest do
 
       handlers = ObservLib.Telemetry.list_handlers()
       handler_ids = Enum.map(handlers, & &1.id)
-      expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+      expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
       refute expected_id in handler_ids
     end
 
@@ -259,7 +259,7 @@ defmodule ObservLib.TelemetryTest do
       handler_ids = Enum.map(handlers, & &1.id)
 
       for prefix <- [prefix1, prefix2] do
-        expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+        expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
         assert expected_id in handler_ids
       end
     end
@@ -289,7 +289,7 @@ defmodule ObservLib.TelemetryTest do
       ObservLib.Telemetry.attach(prefix)
 
       handlers = ObservLib.Telemetry.list_handlers()
-      expected_id = :"observlib_#{Enum.join(Enum.map(prefix, &Atom.to_string/1), "_")}"
+      expected_id = :"observlib_#{Enum.map_join(prefix, "_", &Atom.to_string/1)}"
       handler = Enum.find(handlers, fn %{id: id} -> id == expected_id end)
 
       assert handler != nil

@@ -421,7 +421,7 @@ defmodule ObservLib.Pyroscope.Client do
     ]
 
     try do
-      case ObservLib.HTTP.post(url, profile_data, headers) do
+      case ObservLib.HTTP.post(url, body: profile_data, headers: headers) do
         {:ok, %{status: status}} when status in 200..299 ->
           :ok
 

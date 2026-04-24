@@ -215,24 +215,20 @@ defmodule ObservLib.Traces.PyroscopeProcessor do
     end
   end
 
+  @dialyzer {:nowarn_function, build_current_labels: 0}
   defp build_current_labels do
-    # Get current span context from OTel
     case :otel_tracer.current_span_ctx() do
-      nil ->
+      :undefined ->
         %{}
 
       span_ctx when is_tuple(span_ctx) and tuple_size(span_ctx) == 8 ->
-        try do
-          # Extract trace_id and span_id for Pyroscope correlation
-          {_, trace_id, span_id, _, _, _, _, _} = span_ctx
+        trace_id = elem(span_ctx, 1)
+        span_id = elem(span_ctx, 2)
 
-          %{
-            "trace_id" => format_id(trace_id),
-            "span_id" => format_id(span_id)
-          }
-        rescue
-          _ -> %{}
-        end
+        %{
+          "trace_id" => format_id(trace_id),
+          "span_id" => format_id(span_id)
+        }
 
       _ ->
         %{}

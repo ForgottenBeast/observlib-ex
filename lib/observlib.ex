@@ -93,9 +93,9 @@ defmodule ObservLib do
       :ok
     end
 
-    # TODO: In future phases, this will update Config GenServer state
-    # and reconfigure telemetry components (traces, metrics, logs)
-    # For now, we just validate the options
+    # In future phases, this will update Config GenServer state
+    # and reconfigure telemetry components (traces, metrics, logs).
+    # For now, we just validate the options.
   end
 
   @doc """

@@ -276,15 +276,7 @@ defmodule ObservLib.Test.MockOtlpServer do
         # Switch to raw mode to read body
         :inet.setopts(socket, packet: :raw)
 
-        body =
-          if content_length > 0 do
-            case :gen_tcp.recv(socket, content_length, 5000) do
-              {:ok, data} -> data
-              {:error, _} -> ""
-            end
-          else
-            ""
-          end
+        body = if content_length > 0, do: read_body(socket, content_length), else: ""
 
         {:ok, method, path, body}
 
@@ -304,6 +296,13 @@ defmodule ObservLib.Test.MockOtlpServer do
 
       {:error, _} ->
         acc
+    end
+  end
+
+  defp read_body(socket, content_length) do
+    case :gen_tcp.recv(socket, content_length, 5000) do
+      {:ok, data} -> data
+      {:error, _} -> ""
     end
   end
 

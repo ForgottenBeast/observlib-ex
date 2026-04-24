@@ -159,20 +159,24 @@ defmodule ObservLib.Metrics.PrometheusReader do
       :gen_tcp.close(socket)
       {:noreply, state}
     else
-      case check_rate_limit(state.rate_limiter) do
-        {:ok, new_limiter} ->
-          server_pid = self()
-          spawn(fn -> handle_request(socket, server_pid, state.basic_auth) end)
+      accept_connection(socket, state)
+    end
+  end
 
-          {:noreply,
-           %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
+  defp accept_connection(socket, state) do
+    case check_rate_limit(state.rate_limiter) do
+      {:ok, new_limiter} ->
+        server_pid = self()
+        spawn(fn -> handle_request(socket, server_pid, state.basic_auth) end)
 
-        {:rate_limited, new_limiter} ->
-          Logger.warning("Prometheus rate limit exceeded")
-          send_rate_limit_response(socket)
-          :gen_tcp.close(socket)
-          {:noreply, %{state | rate_limiter: new_limiter}}
-      end
+        {:noreply,
+         %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
+
+      {:rate_limited, new_limiter} ->
+        Logger.warning("Prometheus rate limit exceeded")
+        send_rate_limit_response(socket)
+        :gen_tcp.close(socket)
+        {:noreply, %{state | rate_limiter: new_limiter}}
     end
   end
 
@@ -537,6 +541,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
     |> String.replace(~r/^[^a-zA-Z_]/, "_")
   end
 
+  @dialyzer {:nowarn_function, escape_label_value: 1}
   defp escape_label_value(value) when is_binary(value) do
     value
     # Backslash first!
@@ -570,7 +575,9 @@ defmodule ObservLib.Metrics.PrometheusReader do
           9 -> "\\t"
           # Null byte
           0 -> "\\x00"
-          _ -> "\\x" <> String.pad_leading(Integer.to_string(char, 16) |> String.downcase(), 2, "0")
+          _ ->
+          hex = String.downcase(Integer.to_string(char, 16))
+          "\\x" <> String.pad_leading(hex, 2, "0")
         end
 
       char ->
