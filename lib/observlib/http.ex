@@ -104,7 +104,8 @@ defmodule ObservLib.HTTP do
 
   """
   @spec redact_sensitive_headers(term()) :: term()
-  def redact_sensitive_headers(error_context) when is_map(error_context) do
+  def redact_sensitive_headers(error_context)
+      when is_map(error_context) and not is_struct(error_context) do
     sensitive_patterns = [
       "authorization",
       "x-api-key",

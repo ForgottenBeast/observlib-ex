@@ -5,6 +5,7 @@ config :observlib,
   service_name: "observlib_test",
   log_level: :warning,
   prometheus_rate_limit: 10_000,
+  cardinality_limit: 10,
   resource_attributes: %{
     "deployment.environment" => "test"
   }

@@ -141,9 +141,9 @@ defmodule ObservLib.Security.EtsMemoryBoundsTest do
       # Give ETS time to update
       Process.sleep(50)
 
-      # Verify spans are removed from tracking
+      # Verify spans are removed from tracking (back to baseline)
       final_count = ObservLib.Traces.Provider.active_span_count()
-      assert final_count == 0
+      assert final_count == initial_count
     end
 
     test "stale span cleanup prevents memory leaks" do

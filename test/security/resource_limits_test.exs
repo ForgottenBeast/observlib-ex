@@ -197,6 +197,8 @@ defmodule ObservLib.Security.ResourceLimitsTest do
 
   describe "sec-010: Span count limits" do
     test "span tracking has bounded memory usage" do
+      initial_count = ObservLib.Traces.Provider.active_span_count()
+
       # Create many spans
       spans =
         for i <- 1..1000 do
@@ -205,15 +207,15 @@ defmodule ObservLib.Security.ResourceLimitsTest do
 
       # Verify tracking
       count = ObservLib.Traces.Provider.active_span_count()
-      assert count == 1000
+      assert count == initial_count + 1000
 
       # Clean up - end all spans
       Enum.each(spans, &ObservLib.Traces.Provider.end_span/1)
       Process.sleep(50)
 
-      # Verify cleanup
+      # Verify cleanup (back to baseline)
       final_count = ObservLib.Traces.Provider.active_span_count()
-      assert final_count == 0
+      assert final_count == initial_count
     end
   end
 end
