@@ -71,10 +71,7 @@ defmodule ObservLib.Traces.SupervisorTest do
       assert pyroscope_child == nil
     end
 
-    test "starts PyroscopeProcessor when endpoint is configured" do
-      # In the test environment, pyroscope_endpoint is not configured, so
-      # PyroscopeProcessor should not be a child. This verifies the conditional
-      # child selection logic runs at supervisor init time.
+    test "does not start PyroscopeProcessor when endpoint is absent after env reset" do
       Application.delete_env(:observlib, :pyroscope_endpoint)
 
       sup_pid = Process.whereis(TracesSupervisor)
@@ -83,9 +80,7 @@ defmodule ObservLib.Traces.SupervisorTest do
       children = Supervisor.which_children(sup_pid)
       child_ids = Enum.map(children, fn {id, _, _, _} -> id end)
 
-      # Provider is always present
       assert Provider in child_ids
-      # PyroscopeProcessor is absent when endpoint is not configured
       refute PyroscopeProcessor in child_ids
     end
   end

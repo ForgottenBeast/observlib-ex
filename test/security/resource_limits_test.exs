@@ -8,13 +8,11 @@ defmodule ObservLib.Security.ResourceLimitsTest do
 
   describe "sec-009: Attribute value size truncation" do
     test "truncates oversized string attributes" do
-      # Create a 10KB string (exceeds default 4KB limit)
       large_value = String.duplicate("x", 10_000)
       attrs = %{"large_data" => large_value}
 
       {:ok, result} = ObservLib.Attributes.validate(attrs)
 
-      # Should be truncated with suffix
       assert String.ends_with?(result["large_data"], "...[TRUNC]")
       assert byte_size(result["large_data"]) <= 4096
     end
@@ -64,7 +62,6 @@ defmodule ObservLib.Security.ResourceLimitsTest do
         value = String.duplicate("a", size)
         {:ok, result} = ObservLib.Attributes.validate(%{"key" => value})
 
-        # Result should be valid and not exceed limit
         assert is_map(result)
         assert byte_size(result["key"]) <= 4096
       end
@@ -73,14 +70,11 @@ defmodule ObservLib.Security.ResourceLimitsTest do
 
   describe "sec-011: Attribute count limits" do
     test "limits number of attributes to configured maximum" do
-      # Create 200 attributes (exceeds default 128 limit)
       attrs = Map.new(1..200, fn i -> {"key_#{i}", "value_#{i}"} end)
 
       log =
         capture_log(fn ->
           {:ok, result} = ObservLib.Attributes.validate(attrs)
-
-          # Should be limited to 128
           assert map_size(result) <= 128
         end)
 
@@ -103,7 +97,6 @@ defmodule ObservLib.Security.ResourceLimitsTest do
 
       {:ok, result} = ObservLib.Attributes.validate(attrs)
 
-      # Should keep only first 128 attributes
       assert map_size(result) == 128
     end
 
@@ -116,7 +109,6 @@ defmodule ObservLib.Security.ResourceLimitsTest do
         attrs = Map.new(1..count, fn i -> {"k#{i}", "v#{i}"} end)
         {:ok, result} = ObservLib.Attributes.validate(attrs)
 
-        # Should not exceed limit
         assert map_size(result) <= 128
       end
     end
@@ -131,25 +123,20 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     test "enforces cardinality limit per metric name" do
       limit = min(ObservLib.Config.cardinality_limit(), 10)
 
-      # Fill up to limit
       for i <- 1..limit do
         ObservLib.Metrics.counter("test.metric", 1, %{id: i})
       end
 
-      # Flush all for-loop casts before entering capture_log window
       ObservLib.Metrics.MeterProvider.read("test.metric")
 
-      # Exceeding should be rejected with warning
       log =
         capture_log(fn ->
           ObservLib.Metrics.counter("test.metric", 1, %{id: 9999})
-          # Sync call to flush the async cast so the log is captured
           ObservLib.Metrics.MeterProvider.read("test.metric")
         end)
 
       assert log =~ "Metric cardinality limit exceeded"
 
-      # Verify count stayed at limit
       metrics = ObservLib.Metrics.MeterProvider.read("test.metric")
       assert length(metrics) == limit
     end
@@ -162,7 +149,6 @@ defmodule ObservLib.Security.ResourceLimitsTest do
             ) do
         ObservLib.Metrics.counter("prop.test", 1, %{id: unique_id})
 
-        # Verify we never exceed the limit
         metrics = ObservLib.Metrics.MeterProvider.read("prop.test")
         limit = ObservLib.Config.cardinality_limit()
         assert metrics == nil or length(metrics) <= limit
@@ -199,21 +185,17 @@ defmodule ObservLib.Security.ResourceLimitsTest do
     test "span tracking has bounded memory usage" do
       initial_count = ObservLib.Traces.Provider.active_span_count()
 
-      # Create many spans
       spans =
         for i <- 1..1000 do
           ObservLib.Traces.Provider.start_span("span_#{i}", %{})
         end
 
-      # Verify tracking
       count = ObservLib.Traces.Provider.active_span_count()
       assert count == initial_count + 1000
 
-      # Clean up - end all spans
       Enum.each(spans, &ObservLib.Traces.Provider.end_span/1)
       Process.sleep(50)
 
-      # Verify cleanup (back to baseline)
       final_count = ObservLib.Traces.Provider.active_span_count()
       assert final_count == initial_count
     end
