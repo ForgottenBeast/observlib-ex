@@ -342,14 +342,13 @@ defmodule ObservLib.Pyroscope.Client do
 
   defp format_collapsed_stacks(samples) do
     samples
-    |> Enum.map(fn {_pid, name, stacktrace} ->
+    |> Enum.map_join("\n", fn {_pid, name, stacktrace} ->
       process_name = format_process_name(name)
 
       stack_string =
         stacktrace
         |> Enum.reverse()
-        |> Enum.map(&format_stack_frame/1)
-        |> Enum.join(";")
+        |> Enum.map_join(";", &format_stack_frame/1)
 
       if stack_string != "" do
         "#{process_name};#{stack_string} 1"
@@ -357,7 +356,6 @@ defmodule ObservLib.Pyroscope.Client do
         "#{process_name} 1"
       end
     end)
-    |> Enum.join("\n")
   end
 
   defp format_process_name(nil), do: "anonymous"
@@ -444,8 +442,7 @@ defmodule ObservLib.Pyroscope.Client do
 
     labels_string =
       labels_with_service
-      |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
-      |> Enum.join(",")
+      |> Enum.map_join(",", fn {k, v} -> "#{k}=#{v}" end)
 
     "#{endpoint}/ingest?name=#{URI.encode(labels_string)}&spyName=elixir&sampleRate=#{@default_sample_rate}"
   end

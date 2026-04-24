@@ -24,8 +24,7 @@ defmodule ObservLib.Security.PyroscopeUrlInjectionTest do
 
     labels_string =
       labels_with_service
-      |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
-      |> Enum.join(",")
+      |> Enum.map_join(",", fn {k, v} -> "#{k}=#{v}" end)
 
     "#{endpoint}/ingest?name=#{URI.encode(labels_string)}&spyName=elixir&sampleRate=100"
   end
@@ -40,10 +39,9 @@ defmodule ObservLib.Security.PyroscopeUrlInjectionTest do
 
     labels_string =
       labels_with_service
-      |> Enum.map(fn {k, v} ->
+      |> Enum.map_join(",", fn {k, v} ->
         "#{URI.encode_www_form(to_string(k))}=#{URI.encode_www_form(to_string(v))}"
       end)
-      |> Enum.join(",")
 
     # labels_string keys/values are already percent-encoded; put it directly as name= value
     "#{endpoint}/ingest?name=#{labels_string}&spyName=elixir&sampleRate=100"

@@ -234,7 +234,7 @@ defmodule ObservLib.Metrics.MeterProvider do
       :limit_exceeded ->
         # Log warning but don't crash - drop the metric
         Logger.warning(
-          "Metric cardinality limit exceeded for metric #{name}, limit: #{cardinality_limit}"
+          "Metric cardinality limit exceeded, dropping metric #{name}, limit: #{cardinality_limit}"
         )
 
         {:noreply, state}
@@ -261,7 +261,7 @@ defmodule ObservLib.Metrics.MeterProvider do
 
       :limit_exceeded ->
         Logger.warning(
-          "Metric cardinality limit exceeded for metric #{metric_name}, limit: #{cardinality_limit}"
+          "Metric cardinality limit exceeded, dropping metric #{metric_name}, limit: #{cardinality_limit}"
         )
 
         {:noreply, state}

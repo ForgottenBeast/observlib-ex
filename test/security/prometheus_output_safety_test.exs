@@ -39,7 +39,7 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
   defp escape_control_chars(value) do
     value
     |> String.to_charlist()
-    |> Enum.map(fn
+    |> Enum.map_join(fn
       char when char < 32 or char == 127 ->
         case char do
           10 -> "\\n"
@@ -52,7 +52,6 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
       char ->
         <<char::utf8>>
     end)
-    |> Enum.join()
   end
 
   # Replicates PrometheusReader.format_labels/1 for output structure verification.
@@ -61,12 +60,11 @@ defmodule ObservLib.Security.PrometheusOutputSafetyTest do
   defp format_labels(attrs) do
     label_pairs =
       attrs
-      |> Enum.map(fn {k, v} ->
+      |> Enum.map_join(",", fn {k, v} ->
         key = k |> to_string() |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
         value = escape_label_value(to_string(v))
         "#{key}=\"#{value}\""
       end)
-      |> Enum.join(",")
 
     "{#{label_pairs}}"
   end

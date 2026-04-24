@@ -44,9 +44,7 @@ defmodule ObservLib.Attributes do
       truncated = attributes |> Enum.take(max_count) |> Map.new()
       count = map_size(attributes)
 
-      Logger.warning(
-        "Attribute count exceeded, limit: #{max_count}, count: #{count}"
-      )
+      Logger.warning("Attribute count exceeded, limit: #{max_count}, count: #{count}")
 
       {:ok, truncated |> truncate_values(max_size) |> redact_sensitive()}
     else

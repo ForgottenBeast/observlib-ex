@@ -434,10 +434,9 @@ defmodule ObservLib.Metrics.PrometheusReader do
     # Group metrics by name
     metrics
     |> Enum.group_by(& &1.name)
-    |> Enum.map(fn {name, data_points} ->
+    |> Enum.map_join("\n", fn {name, data_points} ->
       format_metric_family(name, data_points)
     end)
-    |> Enum.join("\n")
   end
 
   defp format_metric_family(name, data_points) do
@@ -510,12 +509,11 @@ defmodule ObservLib.Metrics.PrometheusReader do
   defp format_labels(attrs) do
     label_pairs =
       attrs
-      |> Enum.map(fn {k, v} ->
+      |> Enum.map_join(",", fn {k, v} ->
         key = sanitize_label_name(to_string(k))
         value = escape_label_value(to_string(v))
         "#{key}=\"#{value}\""
       end)
-      |> Enum.join(",")
 
     "{#{label_pairs}}"
   end
@@ -560,7 +558,7 @@ defmodule ObservLib.Metrics.PrometheusReader do
   defp escape_control_chars(value) do
     value
     |> String.to_charlist()
-    |> Enum.map(fn
+    |> Enum.map_join(fn
       char when char < 32 or char == 127 ->
         # Escape control characters as \xHH (except already-escaped \n, \r, \t)
         case char do
@@ -578,7 +576,6 @@ defmodule ObservLib.Metrics.PrometheusReader do
       char ->
         <<char::utf8>>
     end)
-    |> Enum.join()
   end
 
   defp type_to_prometheus(:counter), do: "counter"

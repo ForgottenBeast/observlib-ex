@@ -170,7 +170,7 @@ defmodule ObservLib.Security.InjectionPreventionTest do
     defp escape_controls(value) do
       value
       |> String.to_charlist()
-      |> Enum.map(fn
+      |> Enum.map_join(fn
         char when char < 32 or char == 127 ->
           case char do
             10 -> "\\n"
@@ -183,7 +183,6 @@ defmodule ObservLib.Security.InjectionPreventionTest do
         char ->
           <<char::utf8>>
       end)
-      |> Enum.join()
     end
 
     test "CRLF injection payload has no raw line endings after escaping" do

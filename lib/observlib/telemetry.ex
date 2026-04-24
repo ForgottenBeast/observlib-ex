@@ -255,7 +255,7 @@ defmodule ObservLib.Telemetry do
       raise ArgumentError, "handler_id/1 requires a list of atoms, got: #{inspect(prefix)}"
     end
 
-    suffix = prefix |> Enum.map(&Atom.to_string/1) |> Enum.join("_")
+    suffix = prefix |> Enum.map_join("_", &Atom.to_string/1)
     # Safe: prefix is validated to be atoms from code, not user input
     String.to_atom("observlib_" <> suffix)
   end
@@ -267,7 +267,7 @@ defmodule ObservLib.Telemetry do
 
   @spec span_name([atom()]) :: String.t()
   defp span_name(event_name) do
-    event_name |> Enum.map(&Atom.to_string/1) |> Enum.join(".")
+    event_name |> Enum.map_join(".", &Atom.to_string/1)
   end
 
   @spec extract_duration(map()) :: float() | nil
