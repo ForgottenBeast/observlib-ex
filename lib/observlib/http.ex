@@ -70,6 +70,9 @@ defmodule ObservLib.HTTP do
       uri.host == nil or uri.host == "" ->
         {:error, "Missing or empty host"}
 
+      ssrf_target?(uri.host) ->
+        {:error, "Host resolves to a blocked address (link-local or internal)"}
+
       true ->
         {:ok, url}
     end
@@ -113,10 +116,11 @@ defmodule ObservLib.HTTP do
 
     Map.new(error_context, fn {key, value} ->
       key_lower = String.downcase(to_string(key))
+      value_lower = if is_binary(value), do: String.downcase(value), else: ""
 
       should_redact =
         Enum.any?(sensitive_patterns, fn pattern ->
-          String.contains?(key_lower, pattern)
+          String.contains?(key_lower, pattern) or String.contains?(value_lower, pattern)
         end)
 
       if should_redact do
@@ -169,8 +173,16 @@ defmodule ObservLib.HTTP do
 
   # Private functions
 
+  defp ssrf_target?(host) do
+    host_lower = String.downcase(host)
+    # Block link-local addresses (169.254.x.x) used by cloud metadata services
+    String.starts_with?(host_lower, "169.254.") or
+      # Block .internal hostnames (e.g. metadata.google.internal)
+      String.ends_with?(host_lower, ".internal")
+  end
+
   defp check_plaintext_security(%URI{scheme: "http", host: host}) do
-    if not is_localhost?(host) do
+    if not localhost?(host) do
       Logger.warning(
         "Plaintext HTTP connection to remote host: #{host}. " <>
           "Consider using HTTPS for secure communication."
@@ -180,12 +192,12 @@ defmodule ObservLib.HTTP do
 
   defp check_plaintext_security(_uri), do: :ok
 
-  defp is_localhost?(nil), do: false
-  defp is_localhost?("localhost"), do: true
-  defp is_localhost?("127.0.0.1"), do: true
-  defp is_localhost?("::1"), do: true
+  defp localhost?(nil), do: false
+  defp localhost?("localhost"), do: true
+  defp localhost?("127.0.0.1"), do: true
+  defp localhost?("::1"), do: true
 
-  defp is_localhost?(host) do
+  defp localhost?(host) do
     # Check for localhost variants and loopback addresses
     host
     |> String.downcase()

@@ -359,7 +359,7 @@ defmodule ObservLib.MetricsTest do
     end
 
     property "histogram accepts any numeric value" do
-      check all(value <- float(min: 0.0, max: 10000.0)) do
+      check all(value <- float(min: 0.0, max: 10_000.0)) do
         # Use a fixed event name that's registered in setup
         ObservLib.Metrics.histogram("http.request.duration", value)
 

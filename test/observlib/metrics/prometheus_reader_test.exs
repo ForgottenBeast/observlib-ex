@@ -1,9 +1,9 @@
 defmodule ObservLib.Metrics.PrometheusReaderTest do
   use ExUnit.Case, async: false
 
-  alias ObservLib.Metrics.{PrometheusReader, MeterProvider}
+  alias ObservLib.Metrics.{MeterProvider, PrometheusReader}
 
-  @test_port 19568
+  @test_port 19_568
 
   setup_all do
     # Config and MeterProvider are already started by the Application

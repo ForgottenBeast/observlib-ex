@@ -224,7 +224,7 @@ defmodule ObservLib.Config do
       otlp_metrics_endpoint: otlp_metrics_endpoint,
       otlp_logs_endpoint: otlp_logs_endpoint,
       otlp_headers: Keyword.get(config, :otlp_headers, %{}),
-      otlp_timeout: Keyword.get(config, :otlp_timeout, 10000),
+      otlp_timeout: Keyword.get(config, :otlp_timeout, 10_000),
       batch_size: Keyword.get(config, :batch_size, 512),
       batch_timeout: Keyword.get(config, :batch_timeout, 5000),
       log_batch_limit: Keyword.get(config, :log_batch_limit, 1000),

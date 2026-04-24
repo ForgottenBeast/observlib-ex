@@ -39,11 +39,11 @@ defmodule ObservLib.Pyroscope.ClientTest do
         Client.start_link(
           name: :test_pyroscope_sample_rate,
           endpoint: "http://localhost:4040",
-          sample_rate: 10000
+          sample_rate: 10_000
         )
 
       status = GenServer.call(pid, :get_status)
-      assert status.sample_rate == 10000
+      assert status.sample_rate == 10_000
 
       GenServer.stop(pid)
     end

@@ -12,7 +12,7 @@ defmodule ObservLib.Integration.PrometheusTest do
 
   setup do
     # Use a unique port for each test to avoid conflicts
-    port = Enum.random(19000..19999)
+    port = Enum.random(19_000..19_999)
 
     # Store original config
     original_config = Application.get_all_env(:observlib)

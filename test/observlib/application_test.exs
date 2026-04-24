@@ -1,7 +1,7 @@
 defmodule ObservLib.ApplicationTest do
   use ExUnit.Case, async: false
 
-  alias ObservLib.Exporters.{OtlpTraceExporter, OtlpMetricsExporter, OtlpLogsExporter}
+  alias ObservLib.Exporters.{OtlpLogsExporter, OtlpMetricsExporter, OtlpTraceExporter}
 
   describe "application startup" do
     test "starts successfully with Config GenServer" do

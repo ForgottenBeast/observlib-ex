@@ -1,9 +1,9 @@
 defmodule ObservLib.Traces.SupervisorTest do
   use ExUnit.Case, async: false
 
-  alias ObservLib.Traces.Supervisor, as: TracesSupervisor
   alias ObservLib.Traces.Provider
   alias ObservLib.Traces.PyroscopeProcessor
+  alias ObservLib.Traces.Supervisor, as: TracesSupervisor
 
   setup do
     # Ensure clean state before each test

@@ -1,8 +1,8 @@
 defmodule ObservLib.Metrics.SupervisorTest do
   use ExUnit.Case, async: false
 
-  alias ObservLib.Metrics.Supervisor, as: MetricsSupervisor
   alias ObservLib.Metrics.MeterProvider
+  alias ObservLib.Metrics.Supervisor, as: MetricsSupervisor
 
   setup do
     # Terminate the running Metrics.Supervisor to allow tests to start fresh instances
@@ -102,7 +102,7 @@ defmodule ObservLib.Metrics.SupervisorTest do
 
     test "starts PrometheusReader when prometheus_port configured" do
       # Set prometheus port
-      Application.put_env(:observlib, :prometheus_port, 19569)
+      Application.put_env(:observlib, :prometheus_port, 19_569)
 
       {:ok, sup_pid} = MetricsSupervisor.start_link([])
 

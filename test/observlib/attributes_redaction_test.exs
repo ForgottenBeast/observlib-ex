@@ -277,7 +277,7 @@ defmodule ObservLib.AttributesRedactionTest do
     end
 
     test "handles non-string values" do
-      {:ok, result} = Attributes.validate(%{"password" => 12345})
+      {:ok, result} = Attributes.validate(%{"password" => 12_345})
       assert result["password"] == "[REDACTED]"
     end
 

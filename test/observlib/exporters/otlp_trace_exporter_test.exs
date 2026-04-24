@@ -91,10 +91,10 @@ defmodule ObservLib.Exporters.OtlpTraceExporterTest do
     end
 
     test "configures custom batch timeout" do
-      Application.put_env(:observlib, :otlp_batch_timeout, 10000)
+      Application.put_env(:observlib, :otlp_batch_timeout, 10_000)
 
       assert {:ok, config} = OtlpTraceExporter.get_configuration()
-      assert config.batch_timeout == 10000
+      assert config.batch_timeout == 10_000
     end
 
     test "configures custom max queue size" do

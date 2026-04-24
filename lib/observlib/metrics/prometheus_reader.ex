@@ -102,7 +102,8 @@ defmodule ObservLib.Metrics.PrometheusReader do
          ]) do
       {:ok, listen_socket} ->
         # Start accepting connections in a separate process
-        acceptor_pid = spawn_link(fn -> accept_loop(listen_socket, self()) end)
+        server_pid = self()
+        acceptor_pid = spawn_link(fn -> accept_loop(listen_socket, server_pid) end)
 
         state = %{
           port: port,
@@ -160,7 +161,8 @@ defmodule ObservLib.Metrics.PrometheusReader do
     else
       case check_rate_limit(state.rate_limiter) do
         {:ok, new_limiter} ->
-          spawn(fn -> handle_request(socket, self(), state.basic_auth) end)
+          server_pid = self()
+          spawn(fn -> handle_request(socket, server_pid, state.basic_auth) end)
 
           {:noreply,
            %{state | active_connections: state.active_connections + 1, rate_limiter: new_limiter}}
