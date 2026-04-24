@@ -140,7 +140,6 @@ defmodule ObservLib.Logs.Backend do
       level: :all,
       filter_default: :log,
       filters: [],
-      formatter: {:logger_formatter, %{}},
       config: %{backend_pid: self()}
     }
 
