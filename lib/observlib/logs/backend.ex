@@ -405,6 +405,7 @@ defmodule ObservLib.Logs.Backend.Handler do
     {:ok, new_config}
   end
 
+  @dialyzer {:nowarn_function, extract_trace_context: 0}
   defp extract_trace_context do
     try do
       span_ctx = :otel_tracer.current_span_ctx()

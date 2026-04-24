@@ -42,6 +42,11 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
   end
 
   describe "HTTP endpoint" do
+    setup do
+      MeterProvider.reset()
+      :ok
+    end
+
     test "responds to GET /metrics with 200" do
       {:ok, socket} = :gen_tcp.connect({127, 0, 0, 1}, @test_port, [:binary, active: false])
       :ok = :gen_tcp.send(socket, "GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
@@ -326,6 +331,11 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
   end
 
   describe "label value escaping (sec-014)" do
+    setup do
+      MeterProvider.reset()
+      :ok
+    end
+
     test "escapes backslashes" do
       MeterProvider.record("test_metric", :counter, 1, %{path: "C:\\Users\\test"})
       Process.sleep(20)
@@ -336,8 +346,8 @@ defmodule ObservLib.Metrics.PrometheusReaderTest do
       {:ok, response} = :gen_tcp.recv(socket, 0, 5000)
       :gen_tcp.close(socket)
 
-      # Backslashes should be escaped
-      assert response =~ "\\\\\\\\"
+      # Backslashes should be escaped: one \ in input becomes \\ in Prometheus output
+      assert response =~ "\\\\"
     end
 
     test "escapes double quotes" do

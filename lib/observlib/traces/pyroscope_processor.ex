@@ -235,6 +235,7 @@ defmodule ObservLib.Traces.PyroscopeProcessor do
     end
   end
 
+  @dialyzer {:nowarn_function, format_id: 1}
   defp format_id(id) when is_integer(id) do
     Integer.to_string(id, 16)
   end
