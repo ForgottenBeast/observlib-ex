@@ -246,4 +246,26 @@ defmodule ObservLib.Logs.BackendTest do
       assert log =~ "Resilience test message"
     end
   end
+
+  describe "adding_handler/1" do
+    test "returns the full config unchanged (OTP 28 contract)" do
+      config = %{
+        module: ObservLib.Logs.Backend.Handler,
+        id: :test_otp28_handler,
+        level: :all,
+        filter_default: :log,
+        filters: [],
+        formatter: {:logger_formatter, %{}},
+        config: %{backend_pid: self()}
+      }
+
+      assert {:ok, returned} = ObservLib.Logs.Backend.Handler.adding_handler(config)
+      assert returned == config
+      assert Map.has_key?(returned, :module)
+      assert Map.has_key?(returned, :id)
+      assert Map.has_key?(returned, :filter_default)
+      assert Map.has_key?(returned, :filters)
+      assert Map.has_key?(returned, :formatter)
+    end
+  end
 end

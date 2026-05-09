@@ -392,11 +392,7 @@ defmodule ObservLib.Logs.Backend.Handler do
     :ok
   end
 
-  def adding_handler(config) do
-    # OTP 28+ requires :level key in returned config
-    level = Map.get(config, :level, :all)
-    {:ok, %{level: level}}
-  end
+  def adding_handler(config), do: {:ok, config}
 
   def removing_handler(_config) do
     :ok
