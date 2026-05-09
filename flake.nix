@@ -17,9 +17,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # Pin to OTP 27: OTP 28 changed logger.filter_config/1 in a way that
-        # breaks ExUnit.CaptureLog (Logger.flush/0 passes level: :all which
-        # OTP 28 kernel 10.x rejects). Use erlang_27 for a stable test environment.
+        # OTP 27 pin: adding_handler/1 previously stripped :module from the stored
+        # handler config. OTP 28 logger:filter_config/1 requires :module and crashes
+        # at Logger.flush/0 when absent. Fixed in this branch — pin can be lifted to
+        # erlang_28 once the fix is verified on OTP 28 in CI.
         beamPackages = pkgs.beam.packages.erlang_27;
         inherit (beamPackages) elixir;
 
