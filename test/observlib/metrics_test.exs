@@ -1,72 +1,52 @@
 defmodule ObservLib.MetricsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   use ExUnitProperties
 
+  alias ObservLib.Metrics.MeterProvider
+
   setup do
-    # Clear the metrics registry before each test
-    Process.delete(:observlib_metrics_registry)
-
-    # Attach a test telemetry handler to capture events
-    # We use a unique handler ID per test to avoid conflicts
-    test_pid = self()
-    handler_id = :"test_metrics_handler_#{:erlang.unique_integer()}"
-
-    # Handler function that captures all events
-    handler_fun = fn event_name, measurements, metadata, _config ->
-      send(test_pid, {:telemetry_event, event_name, measurements, metadata})
-    end
-
-    # Attach handlers for all event names we'll use in tests
-    event_names = [
-      [:http, :requests],
-      [:memory, :usage],
-      [:http, :request, :duration],
-      [:active, :connections],
-      [:api, :calls],
-      [:queue, :depth],
-      [:db, :query, :time],
-      [:temperature],
-      [:api_calls],
-      [:queue_depth],
-      [:db_query_time]
-    ]
-
-    :telemetry.attach_many(handler_id, event_names, handler_fun, nil)
-
-    on_exit(fn ->
-      :telemetry.detach(handler_id)
-      Process.delete(:observlib_metrics_registry)
-    end)
-
+    MeterProvider.reset()
     :ok
+  end
+
+  defp read(name) do
+    metrics = MeterProvider.read_all()
+    Enum.find(metrics, &(&1.name == name))
   end
 
   describe "counter/3" do
     test "increments counter with value" do
       ObservLib.Metrics.counter("http.requests", 1, %{method: "GET"})
 
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1},
-                      %{method: "GET", metric_type: :counter}}
+      metric = read("http.requests")
+      assert metric != nil
+      assert metric.type == :counter
+      assert metric.data.value == 1
     end
 
     test "accepts atom as metric name" do
       ObservLib.Metrics.counter(:api_calls, 5, %{endpoint: "/users"})
 
-      assert_receive {:telemetry_event, [:api_calls], %{count: 5},
-                      %{endpoint: "/users", metric_type: :counter}}
+      metric = read("api_calls")
+      assert metric != nil
+      assert metric.type == :counter
+      assert metric.data.value == 5
     end
 
     test "works with empty attributes" do
       ObservLib.Metrics.counter("http.requests", 1)
 
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, %{metric_type: :counter}}
+      metric = read("http.requests")
+      assert metric != nil
+      assert metric.data.value == 1
     end
 
     test "accepts float values" do
       ObservLib.Metrics.counter("http.requests", 1.5, %{method: "POST"})
 
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1.5},
-                      %{method: "POST", metric_type: :counter}}
+      metric = read("http.requests")
+      assert metric != nil
+      assert_in_delta metric.data.value, 1.5, 0.001
     end
 
     test "requires non-negative value" do
@@ -75,15 +55,12 @@ defmodule ObservLib.MetricsTest do
       end
     end
 
-    test "includes attributes in metadata" do
-      attrs = %{method: "GET", status: 200, path: "/api/users"}
-      ObservLib.Metrics.counter("http.requests", 1, attrs)
+    test "accumulates multiple increments" do
+      ObservLib.Metrics.counter("http.requests", 1, %{method: "GET"})
+      ObservLib.Metrics.counter("http.requests", 2, %{method: "GET"})
 
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, metadata}
-      assert metadata.method == "GET"
-      assert metadata.status == 200
-      assert metadata.path == "/api/users"
-      assert metadata.metric_type == :counter
+      metric = read("http.requests")
+      assert metric.data.value == 3
     end
   end
 
@@ -91,34 +68,51 @@ defmodule ObservLib.MetricsTest do
     test "sets gauge value" do
       ObservLib.Metrics.gauge("memory.usage", 1024.5, %{type: "heap"})
 
-      assert_receive {:telemetry_event, [:memory, :usage], %{value: 1024.5},
-                      %{type: "heap", metric_type: :gauge}}
+      metric = read("memory.usage")
+      assert metric != nil
+      assert metric.type == :gauge
+      assert_in_delta metric.data.value, 1024.5, 0.001
     end
 
     test "accepts atom as metric name" do
       ObservLib.Metrics.gauge(:queue_depth, 42, %{queue: "default"})
 
-      assert_receive {:telemetry_event, [:queue_depth], %{value: 42},
-                      %{queue: "default", metric_type: :gauge}}
+      metric = read("queue_depth")
+      assert metric != nil
+      assert metric.type == :gauge
+      assert metric.data.value == 42
     end
 
     test "works with empty attributes" do
       ObservLib.Metrics.gauge("memory.usage", 2048)
 
-      assert_receive {:telemetry_event, [:memory, :usage], %{value: 2048}, %{metric_type: :gauge}}
+      metric = read("memory.usage")
+      assert metric != nil
+      assert metric.data.value == 2048
     end
 
     test "accepts negative values" do
       ObservLib.Metrics.gauge("temperature", -10.5, %{location: "outside"})
 
-      assert_receive {:telemetry_event, [:temperature], %{value: -10.5},
-                      %{location: "outside", metric_type: :gauge}}
+      metric = read("temperature")
+      assert metric != nil
+      assert_in_delta metric.data.value, -10.5, 0.001
     end
 
     test "accepts zero value" do
       ObservLib.Metrics.gauge("memory.usage", 0, %{})
 
-      assert_receive {:telemetry_event, [:memory, :usage], %{value: 0}, _metadata}
+      metric = read("memory.usage")
+      assert metric != nil
+      assert metric.data.value == 0
+    end
+
+    test "last write wins" do
+      ObservLib.Metrics.gauge("memory.usage", 100)
+      ObservLib.Metrics.gauge("memory.usage", 200)
+
+      metric = read("memory.usage")
+      assert metric.data.value == 200
     end
   end
 
@@ -126,28 +120,47 @@ defmodule ObservLib.MetricsTest do
     test "records histogram observation" do
       ObservLib.Metrics.histogram("http.request.duration", 45.2, %{method: "GET"})
 
-      assert_receive {:telemetry_event, [:http, :request, :duration], %{value: 45.2},
-                      %{method: "GET", metric_type: :histogram}}
+      metric = read("http.request.duration")
+      assert metric != nil
+      assert metric.type == :histogram
+      assert metric.data.count == 1
+      assert_in_delta metric.data.sum, 45.2, 0.001
     end
 
     test "accepts atom as metric name" do
       ObservLib.Metrics.histogram(:db_query_time, 123.4, %{table: "users"})
 
-      assert_receive {:telemetry_event, [:db_query_time], %{value: 123.4},
-                      %{table: "users", metric_type: :histogram}}
+      metric = read("db_query_time")
+      assert metric != nil
+      assert metric.type == :histogram
+      assert metric.data.count == 1
     end
 
     test "works with empty attributes" do
       ObservLib.Metrics.histogram("http.request.duration", 100.0)
 
-      assert_receive {:telemetry_event, [:http, :request, :duration], %{value: 100.0},
-                      %{metric_type: :histogram}}
+      metric = read("http.request.duration")
+      assert metric != nil
+      assert_in_delta metric.data.sum, 100.0, 0.001
     end
 
     test "accepts integer values" do
       ObservLib.Metrics.histogram("http.request.duration", 50, %{})
 
-      assert_receive {:telemetry_event, [:http, :request, :duration], %{value: 50}, _metadata}
+      metric = read("http.request.duration")
+      assert metric.data.sum == 50
+    end
+
+    test "accumulates multiple observations" do
+      ObservLib.Metrics.histogram("http.request.duration", 10.0)
+      ObservLib.Metrics.histogram("http.request.duration", 20.0)
+      ObservLib.Metrics.histogram("http.request.duration", 30.0)
+
+      metric = read("http.request.duration")
+      assert metric.data.count == 3
+      assert_in_delta metric.data.sum, 60.0, 0.001
+      assert_in_delta metric.data.min, 10.0, 0.001
+      assert_in_delta metric.data.max, 30.0, 0.001
     end
   end
 
@@ -155,35 +168,86 @@ defmodule ObservLib.MetricsTest do
     test "increments up-down counter" do
       ObservLib.Metrics.up_down_counter("active.connections", 1, %{protocol: "http"})
 
-      assert_receive {:telemetry_event, [:active, :connections], %{value: 1},
-                      %{protocol: "http", metric_type: :up_down_counter}}
+      metric = read("active.connections")
+      assert metric != nil
+      assert metric.type == :up_down_counter
+      assert metric.data.value == 1
     end
 
     test "decrements up-down counter" do
-      ObservLib.Metrics.up_down_counter("active.connections", -1, %{protocol: "http"})
+      ObservLib.Metrics.up_down_counter("active.connections", 5)
+      ObservLib.Metrics.up_down_counter("active.connections", -2)
 
-      assert_receive {:telemetry_event, [:active, :connections], %{value: -1},
-                      %{protocol: "http", metric_type: :up_down_counter}}
+      metric = read("active.connections")
+      assert metric.data.value == 3
     end
 
     test "accepts atom as metric name" do
       ObservLib.Metrics.up_down_counter(:api_calls, 3, %{})
 
-      assert_receive {:telemetry_event, [:api_calls], %{value: 3},
-                      %{metric_type: :up_down_counter}}
+      metric = read("api_calls")
+      assert metric != nil
+      assert metric.data.value == 3
     end
 
     test "works with empty attributes" do
       ObservLib.Metrics.up_down_counter("active.connections", 5)
 
-      assert_receive {:telemetry_event, [:active, :connections], %{value: 5},
-                      %{metric_type: :up_down_counter}}
+      metric = read("active.connections")
+      assert metric.data.value == 5
     end
 
     test "accepts zero value" do
       ObservLib.Metrics.up_down_counter("active.connections", 0, %{})
 
-      assert_receive {:telemetry_event, [:active, :connections], %{value: 0}, _metadata}
+      metric = read("active.connections")
+      assert metric != nil
+      assert metric.data.value == 0
+    end
+  end
+
+  describe "re-entry safety (regression: normatix-cjsdh.60)" do
+    test "counter called from a telemetry handler does not recurse" do
+      call_count = :counters.new(1, [])
+      test_pid = self()
+
+      :telemetry.attach(
+        :reentry_regression_test,
+        [:oban, :job, :exception],
+        fn _event, _m, _meta, _cfg ->
+          :counters.add(call_count, 1, 1)
+          # metric name maps to the same event name — used to cause infinite recursion
+          ObservLib.Metrics.counter("oban.job.exception", 1, %{})
+          send(test_pid, :handler_called)
+        end,
+        nil
+      )
+
+      :telemetry.execute([:oban, :job, :exception], %{}, %{})
+
+      assert_receive :handler_called, 1000
+      assert :counters.get(call_count, 1) == 1
+
+      :telemetry.detach(:reentry_regression_test)
+    end
+
+    test "counter does not emit a telemetry event" do
+      test_pid = self()
+
+      :telemetry.attach(
+        :no_reemit_test,
+        [:http, :requests],
+        fn _event, _m, _meta, _cfg ->
+          send(test_pid, :unexpected_event)
+        end,
+        nil
+      )
+
+      ObservLib.Metrics.counter("http.requests", 1)
+
+      refute_receive :unexpected_event, 100
+
+      :telemetry.detach(:no_reemit_test)
     end
   end
 
@@ -229,8 +293,7 @@ defmodule ObservLib.MetricsTest do
       metrics = ObservLib.Metrics.list_registered_metrics()
       matching = Enum.filter(metrics, &(&1.name == "http.requests"))
       assert length(matching) == 1
-      metric = List.first(matching)
-      assert metric.opts[:unit] == :byte
+      assert List.first(matching).opts[:unit] == :byte
     end
   end
 
@@ -285,11 +348,8 @@ defmodule ObservLib.MetricsTest do
   end
 
   describe "list_registered_metrics/0" do
-    test "returns empty list when no metrics registered" do
-      # In async mode other tests may have registered metrics.
-      # Verify the return type is always a list.
-      result = ObservLib.Metrics.list_registered_metrics()
-      assert is_list(result)
+    test "returns a list" do
+      assert is_list(ObservLib.Metrics.list_registered_metrics())
     end
 
     test "returns all registered metrics" do
@@ -297,9 +357,7 @@ defmodule ObservLib.MetricsTest do
       ObservLib.Metrics.register_gauge("memory.usage", unit: :byte)
       ObservLib.Metrics.register_histogram("http.request.duration", unit: :millisecond)
 
-      metrics = ObservLib.Metrics.list_registered_metrics()
-
-      names = Enum.map(metrics, & &1.name)
+      names = ObservLib.Metrics.list_registered_metrics() |> Enum.map(& &1.name)
       assert "http.requests" in names
       assert "memory.usage" in names
       assert "http.request.duration" in names
@@ -309,16 +367,17 @@ defmodule ObservLib.MetricsTest do
       ObservLib.Metrics.register_counter("http.requests", unit: :count)
       ObservLib.Metrics.register_counter("http.requests", unit: :byte)
 
-      metrics = ObservLib.Metrics.list_registered_metrics()
-      matching = Enum.filter(metrics, &(&1.name == "http.requests"))
+      matching =
+        ObservLib.Metrics.list_registered_metrics()
+        |> Enum.filter(&(&1.name == "http.requests"))
+
       assert length(matching) == 1
-      metric = List.first(matching)
-      assert metric.opts[:unit] == :byte
+      assert List.first(matching).opts[:unit] == :byte
     end
   end
 
   describe "property-based tests" do
-    property "counter always emits positive values" do
+    property "counter stores positive values in ETS" do
       check all(
               value <- positive_integer(),
               attr_count <- integer(0..5),
@@ -329,53 +388,52 @@ defmodule ObservLib.MetricsTest do
                   length: attr_count
                 )
             ) do
-        # Use a fixed event name that's registered in setup
-        ObservLib.Metrics.counter("http.requests", value, attrs)
+        name = "prop.counter.#{:erlang.unique_integer([:positive])}"
+        ObservLib.Metrics.counter(name, value, attrs)
 
-        assert_receive {:telemetry_event, _event_name, %{count: ^value}, metadata}
-        assert metadata.metric_type == :counter
-
-        # Compare against sanitized attrs since attribute values may be redacted
-        {:ok, safe_attrs} = ObservLib.Attributes.validate(attrs)
-
-        Enum.each(safe_attrs, fn {key, val} ->
-          assert Map.get(metadata, key) == val
-        end)
+        metric = read(name)
+        assert metric != nil
+        assert metric.type == :counter
+        assert metric.data.value == value
       end
     end
 
-    property "gauge accepts any numeric value" do
+    property "gauge stores any numeric value in ETS" do
       check all(
               value <- float(min: -1000.0, max: 1000.0),
               attrs <- map_of(string(:alphanumeric, min_length: 1), string(:printable))
             ) do
-        # Use a fixed event name that's registered in setup
-        ObservLib.Metrics.gauge("memory.usage", value, attrs)
+        name = "prop.gauge.#{:erlang.unique_integer([:positive])}"
+        ObservLib.Metrics.gauge(name, value, attrs)
 
-        assert_receive {:telemetry_event, _event_name, %{value: received_value}, metadata}
-        assert_in_delta received_value, value, 0.001
-        assert metadata.metric_type == :gauge
+        metric = read(name)
+        assert metric != nil
+        assert metric.type == :gauge
+        assert_in_delta metric.data.value, value, 0.001
       end
     end
 
-    property "histogram accepts any numeric value" do
+    property "histogram stores any numeric value in ETS" do
       check all(value <- float(min: 0.0, max: 10_000.0)) do
-        # Use a fixed event name that's registered in setup
-        ObservLib.Metrics.histogram("http.request.duration", value)
+        name = "prop.histogram.#{:erlang.unique_integer([:positive])}"
+        ObservLib.Metrics.histogram(name, value)
 
-        assert_receive {:telemetry_event, _event_name, %{value: received_value}, metadata}
-        assert_in_delta received_value, value, 0.001
-        assert metadata.metric_type == :histogram
+        metric = read(name)
+        assert metric != nil
+        assert metric.type == :histogram
+        assert_in_delta metric.data.sum, value, 0.001
       end
     end
 
     property "up_down_counter accepts positive and negative values" do
       check all(value <- integer(-100..100)) do
-        # Use a fixed event name that's registered in setup
-        ObservLib.Metrics.up_down_counter("active.connections", value)
+        name = "prop.updown.#{:erlang.unique_integer([:positive])}"
+        ObservLib.Metrics.up_down_counter(name, value)
 
-        assert_receive {:telemetry_event, _event_name, %{value: ^value}, metadata}
-        assert metadata.metric_type == :up_down_counter
+        metric = read(name)
+        assert metric != nil
+        assert metric.type == :up_down_counter
+        assert metric.data.value == value
       end
     end
 
@@ -404,59 +462,30 @@ defmodule ObservLib.MetricsTest do
   describe "atom table safety (sec-002)" do
     @tag :security
     test "handles large number of unique metric names without exhausting atom table" do
-      # This test verifies the fix for sec-002: atom table exhaustion vulnerability
-      # Previously, String.to_atom/1 was used unsafely, allowing unbounded atom creation
-      # Now uses String.to_existing_atom/1 with controlled fallback
-
-      # Create 1000 unique metric names to test safety
-      # In production, this could be triggered by user-controlled input
-      unique_metrics =
-        for i <- 1..1000 do
-          "test.metric.security.#{i}.#{:erlang.unique_integer([:positive])}"
-        end
-
-      # This should complete without crashing the VM
-      # Warnings will be logged for new atoms (captured by Logger backend)
-      for metric_name <- unique_metrics do
-        ObservLib.Metrics.counter(metric_name, 1, %{test: "security"})
+      for i <- 1..1000 do
+        ObservLib.Metrics.counter("test.metric.security.#{i}.#{:erlang.unique_integer([:positive])}", 1, %{test: "security"})
       end
 
-      # Verify the VM is still functional after stress test
-      # Use a pre-registered event name from setup
+      # VM still functional; a fixed name records correctly
       ObservLib.Metrics.counter("http.requests", 1, %{test: "after_stress"})
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, _}
+      metric = read("http.requests")
+      assert metric != nil
     end
 
     @tag :security
-    test "reuses existing atoms without creating new ones" do
-      # Use pre-registered event names from setup
+    test "reuses metric without errors on repeated calls" do
       ObservLib.Metrics.counter("http.requests", 1)
-      assert_receive {:telemetry_event, [:http, :requests], _, _}
+      ObservLib.Metrics.counter("http.requests", 1)
 
-      # Second call should work without errors
-      ObservLib.Metrics.counter("http.requests", 1)
-      assert_receive {:telemetry_event, [:http, :requests], _, _}
+      metric = read("http.requests")
+      assert metric.data.value == 2
     end
 
     @tag :security
     test "validates handler_id input is atoms only" do
-      # This validates the telemetry.ex fix
-      # handler_id now validates all prefix elements are atoms
       valid_prefix = [:my, :app, :event]
       assert :ok = ObservLib.Telemetry.attach(valid_prefix)
-
-      # Clean up
       ObservLib.Telemetry.detach(valid_prefix)
-    end
-
-    @tag :security
-    test "safe_to_atom uses existing atoms when available" do
-      # These should use existing atoms that were pre-registered in setup
-      ObservLib.Metrics.counter("http.requests", 1)
-      assert_receive {:telemetry_event, [:http, :requests], %{count: 1}, _}
-
-      ObservLib.Metrics.gauge("memory.usage", 100)
-      assert_receive {:telemetry_event, [:memory, :usage], %{value: 100}, _}
     end
   end
 end
