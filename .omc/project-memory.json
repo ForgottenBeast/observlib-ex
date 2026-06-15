@@ -1,0 +1,459 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776961079210,
+  "projectRoot": "/home/urist/observlib-ex",
+  "techStack": {
+    "languages": [
+      {
+        "name": "C/C++",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Makefile"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "make build",
+    "testCommand": "make test",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "lib",
+      "scripts",
+      "test"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "_build": {
+      "path": "_build",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776961079122,
+      "keyFiles": []
+    },
+    "config": {
+      "path": "config",
+      "purpose": "Configuration files",
+      "fileCount": 4,
+      "lastAccessed": 1776961079159,
+      "keyFiles": [
+        "config.exs",
+        "dev.exs",
+        "runtime.exs",
+        "test.exs"
+      ]
+    },
+    "deps": {
+      "path": "deps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776961079165,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1776961079167,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 4,
+      "lastAccessed": 1776961079171,
+      "keyFiles": [
+        "basic_usage.exs",
+        "custom_metrics.exs",
+        "ecto_integration.exs",
+        "phoenix_integration.exs"
+      ]
+    },
+    "guides": {
+      "path": "guides",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1776961079174,
+      "keyFiles": [
+        "configuration.md",
+        "custom-instrumentation.md",
+        "getting-started.md"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 1,
+      "lastAccessed": 1776961079176,
+      "keyFiles": [
+        "observlib.ex"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1776961079180,
+      "keyFiles": [
+        "generate_book_stubs.exs",
+        "run-static-analysis.sh"
+      ]
+    },
+    "test": {
+      "path": "test",
+      "purpose": "Test files",
+      "fileCount": 3,
+      "lastAccessed": 1776961079186,
+      "keyFiles": [
+        "elixir_rs_test.exs.skip",
+        "observlib_test.exs",
+        "test_helper.exs"
+      ]
+    },
+    "_build/test": {
+      "path": "_build/test",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1776961079196,
+      "keyFiles": []
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 2,
+      "lastAccessed": 1776961079201,
+      "keyFiles": [
+        "README.md",
+        "logo.svg"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "lib/observlib/metrics/prometheus_reader.ex",
+      "accessCount": 49,
+      "lastAccessed": 1777039281567,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/http.ex",
+      "accessCount": 31,
+      "lastAccessed": 1777045455513,
+      "type": "file"
+    },
+    {
+      "path": "test/security/resource_limits_test.exs",
+      "accessCount": 22,
+      "lastAccessed": 1777045487867,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/logs/backend.ex",
+      "accessCount": 19,
+      "lastAccessed": 1777041016650,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/metrics/meter_provider.ex",
+      "accessCount": 18,
+      "lastAccessed": 1777044390143,
+      "type": "file"
+    },
+    {
+      "path": "test/security/ets_memory_bounds_test.exs",
+      "accessCount": 18,
+      "lastAccessed": 1777045493112,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/pyroscope/client.ex",
+      "accessCount": 17,
+      "lastAccessed": 1777042630856,
+      "type": "file"
+    },
+    {
+      "path": "test/integration/otlp_export_test.exs",
+      "accessCount": 16,
+      "lastAccessed": 1776979390742,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/metrics/prometheus_reader_test.exs",
+      "accessCount": 16,
+      "lastAccessed": 1777040192910,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/exporters/otlp_logs_exporter.ex",
+      "accessCount": 16,
+      "lastAccessed": 1777043344355,
+      "type": "file"
+    },
+    {
+      "path": "lib",
+      "accessCount": 14,
+      "lastAccessed": 1777042262748,
+      "type": "directory"
+    },
+    {
+      "path": "lib/observlib/exporters/otlp_metrics_exporter.ex",
+      "accessCount": 14,
+      "lastAccessed": 1777046892157,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/attributes.ex",
+      "accessCount": 11,
+      "lastAccessed": 1777017543715,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/traces/supervisor_test.exs",
+      "accessCount": 11,
+      "lastAccessed": 1777045455918,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/config.ex",
+      "accessCount": 10,
+      "lastAccessed": 1777046743589,
+      "type": "file"
+    },
+    {
+      "path": "config/test.exs",
+      "accessCount": 10,
+      "lastAccessed": 1777047143617,
+      "type": "file"
+    },
+    {
+      "path": "test/integration/full_pipeline_test.exs",
+      "accessCount": 9,
+      "lastAccessed": 1776981801773,
+      "type": "file"
+    },
+    {
+      "path": ".credo.exs",
+      "accessCount": 9,
+      "lastAccessed": 1777023945827,
+      "type": "file"
+    },
+    {
+      "path": "test",
+      "accessCount": 9,
+      "lastAccessed": 1777044427210,
+      "type": "directory"
+    },
+    {
+      "path": "lib/observlib/telemetry.ex",
+      "accessCount": 8,
+      "lastAccessed": 1777023856578,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/traces/pyroscope_processor.ex",
+      "accessCount": 8,
+      "lastAccessed": 1777040173383,
+      "type": "file"
+    },
+    {
+      "path": "test/security/prometheus_output_safety_test.exs",
+      "accessCount": 8,
+      "lastAccessed": 1777041198172,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/exporters/otlp_logs_exporter_test.exs",
+      "accessCount": 8,
+      "lastAccessed": 1777043315855,
+      "type": "file"
+    },
+    {
+      "path": "test/integration/prometheus_test.exs",
+      "accessCount": 7,
+      "lastAccessed": 1776998847449,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/exporters/otlp_trace_exporter_test.exs",
+      "accessCount": 7,
+      "lastAccessed": 1777047356055,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 6,
+      "lastAccessed": 1777043316393,
+      "type": "directory"
+    },
+    {
+      "path": "mix.exs",
+      "accessCount": 5,
+      "lastAccessed": 1777023599794,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/pyroscope/client_test.exs",
+      "accessCount": 5,
+      "lastAccessed": 1777041904547,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/metrics/supervisor_test.exs",
+      "accessCount": 5,
+      "lastAccessed": 1777044323313,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/application_test.exs",
+      "accessCount": 5,
+      "lastAccessed": 1777046296398,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/metrics/meter_provider_test.exs",
+      "accessCount": 4,
+      "lastAccessed": 1777017320426,
+      "type": "file"
+    },
+    {
+      "path": "test/security/pyroscope_url_injection_test.exs",
+      "accessCount": 4,
+      "lastAccessed": 1777017434561,
+      "type": "file"
+    },
+    {
+      "path": "test/security/injection_prevention_test.exs",
+      "accessCount": 4,
+      "lastAccessed": 1777017468077,
+      "type": "file"
+    },
+    {
+      "path": "test/test_helper.exs",
+      "accessCount": 4,
+      "lastAccessed": 1777043786750,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/metrics_test.exs",
+      "accessCount": 4,
+      "lastAccessed": 1777044481614,
+      "type": "file"
+    },
+    {
+      "path": "test/security/telemetry_redaction_test.exs",
+      "accessCount": 3,
+      "lastAccessed": 1777013181202,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/attributes_redaction_test.exs",
+      "accessCount": 3,
+      "lastAccessed": 1777013979065,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/application.ex",
+      "accessCount": 3,
+      "lastAccessed": 1777046170619,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/logs/backend_test.exs",
+      "accessCount": 2,
+      "lastAccessed": 1776961138054,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/metrics.ex",
+      "accessCount": 2,
+      "lastAccessed": 1777013290532,
+      "type": "file"
+    },
+    {
+      "path": "test/security/atom_exhaustion_test.exs",
+      "accessCount": 2,
+      "lastAccessed": 1777013516925,
+      "type": "file"
+    },
+    {
+      "path": "test/security/url_validation_test.exs",
+      "accessCount": 2,
+      "lastAccessed": 1777013945730,
+      "type": "file"
+    },
+    {
+      "path": "test/security/header_redaction_test.exs",
+      "accessCount": 2,
+      "lastAccessed": 1777014169738,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/traces/provider.ex",
+      "accessCount": 2,
+      "lastAccessed": 1777023306467,
+      "type": "file"
+    },
+    {
+      "path": "config/config.exs",
+      "accessCount": 2,
+      "lastAccessed": 1777042996504,
+      "type": "directory"
+    },
+    {
+      "path": "lib/observlib/metrics/supervisor.ex",
+      "accessCount": 2,
+      "lastAccessed": 1777046604016,
+      "type": "file"
+    },
+    {
+      "path": "lib/observlib/logs/supervisor.ex",
+      "accessCount": 1,
+      "lastAccessed": 1776978433298,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/config_test.exs",
+      "accessCount": 1,
+      "lastAccessed": 1776981212387,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/traces/provider_test.exs",
+      "accessCount": 1,
+      "lastAccessed": 1776998268827,
+      "type": "file"
+    },
+    {
+      "path": "test/observlib/http_test.exs",
+      "accessCount": 1,
+      "lastAccessed": 1777013936574,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

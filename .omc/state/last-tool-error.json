@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"mix compile 2>&1\",\"timeout\":60000,\"description\":\"Compile Elixir project\"}",
+  "error": "Exit code 1\nmix: /dev/mixer: No such file or directory",
+  "timestamp": "2026-04-24T15:44:10.168Z",
+  "retry_count": 2
+}

@@ -1,0 +1,77 @@
+{
+  "title": "Fix all CI failures in observlib-ex",
+  "description": "Make all 6 CI jobs green: Format check, Credo (strict), Unit tests, Security tests, Dialyzer, and Nix smoke test",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Fix Format check CI job",
+      "priority": "high",
+      "description": "Ensure mix format --check-formatted passes on all modified files",
+      "acceptanceCriteria": [
+        "mix format --check-formatted exits with code 0",
+        "CI Format check job shows success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Fix Credo (strict) CI job",
+      "priority": "high",
+      "description": "Ensure mix credo --strict passes with no issues",
+      "acceptanceCriteria": [
+        "mix credo --strict exits with code 0 on CI (Elixir 1.16.3 / OTP 26.2.5)",
+        "CI Credo job shows success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Fix Unit tests CI job",
+      "priority": "high",
+      "description": "Ensure mix test passes with 0 failures",
+      "acceptanceCriteria": [
+        "mix test exits with 0 failures",
+        "Supervisor tests use already-running application supervisor instead of stopping/restarting",
+        "Span count assertions use initial_count baseline (not == 0)",
+        "cardinality_limit: 10 in test.exs to enable cardinality tests to trigger",
+        "CI Unit tests job shows success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Fix Security tests CI job",
+      "priority": "high",
+      "description": "Ensure mix test --only security passes with 0 failures",
+      "acceptanceCriteria": [
+        "mix test --only security exits with 0 failures",
+        "CI Security tests job shows success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Fix Dialyzer CI job",
+      "priority": "high",
+      "description": "Ensure mix dialyzer passes with no errors",
+      "acceptanceCriteria": [
+        "mix dialyzer exits with 0 errors on CI (Elixir 1.16.3 / OTP 26.2.5)",
+        "@dialyzer nowarn_function annotations added where needed",
+        "CI Dialyzer job shows success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-006",
+      "title": "Fix Nix smoke test CI job",
+      "priority": "high",
+      "description": "Ensure nix develop -c mix test passes in CI",
+      "acceptanceCriteria": [
+        "CI Nix smoke test job shows success"
+      ],
+      "passes": true
+    }
+  ],
+  "reviewer": "architect",
+  "model_tier": "medium"
+}

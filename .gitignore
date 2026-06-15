@@ -1,0 +1,39 @@
+# Lock files
+.lock
+*.lock
+
+# Beads runtime (rebuilt from issues.jsonl)
+.beads/*.db
+.beads/*.db-*
+.beads/.br_history/
+.beads/.br_recovery/
+.beads/last-touched
+.beads/.sync.lock
+.beads/sync-state.json
+.beads/.local_version
+.beads/daemon.*
+.beads/bd.sock
+.beads/redirect
+.beads/beads.base.*
+.beads/beads.left.*
+.beads/beads.right.*
+.beads/sync_base.jsonl
+
+# OMC ephemeral session state
+.omc/state/sessions/
+.omc/state/hud-stdin-cache.json
+
+# Claude runtime
+.claude/settings.json
+.claude/worktrees/
+.claude/skills/
+.claude/backups/
+
+# Agent KB runtime (rebuilt from agent-kb-events.jsonl)
+.agent-kb/agent-kb.db
+.agent-kb/agent-kb.db-wal
+.agent-kb/agent-kb.db-shm
+.agent-kb/agent-kb.db-*
+
+# TLC model checker output (state files are 150MB+ — too large for GitHub)
+spec/states/
