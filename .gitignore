@@ -26,3 +26,6 @@ elixir_rs-*.tar
 /tmp/
 .omc
 **/.br_history
+
+# bv (beads viewer) local config and caches
+.bv/
