@@ -29,3 +29,9 @@ elixir_rs-*.tar
 
 # bv (beads viewer) local config and caches
 .bv/
+.state/
+.beads
+.claude
+.agent-kb
+CLAUDE.md
+AGENTS.md
