@@ -105,10 +105,15 @@ defmodule ObservLib.Logs.Backend do
       level: level
     }
 
-    # Register as Logger backend after init
-    Process.send_after(self(), :register_backend, 0)
+    # Register as Logger backend after GenServer initialization
+    {:ok, state, {:continue, :register_backend}}
+  end
 
-    {:ok, state}
+  @impl true
+  def handle_continue(:register_backend, state) do
+    register_as_logger_backend()
+
+    {:noreply, state}
   end
 
   @impl true
@@ -133,8 +138,7 @@ defmodule ObservLib.Logs.Backend do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info(:register_backend, state) do
+  defp register_as_logger_backend do
     # Add ourselves as a Logger handler using Erlang's :logger
     handler_config = %{
       level: :all,
@@ -156,7 +160,7 @@ defmodule ObservLib.Logs.Backend do
         Logger.warning("Failed to register ObservLib.Logs.Backend: #{inspect(reason)}")
     end
 
-    {:noreply, state}
+    :ok
   end
 
   @impl true
