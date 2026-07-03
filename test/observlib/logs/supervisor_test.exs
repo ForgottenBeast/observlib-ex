@@ -8,23 +8,58 @@ defmodule ObservLib.Logs.SupervisorTest do
       assert Process.whereis(ObservLib.Logs.Supervisor) != nil
     end
 
-    test "supervisor has correct children" do
-      children = Supervisor.which_children(ObservLib.Logs.Supervisor)
+    test "no-op mode: children/0 is empty when no OTLP endpoint is configured" do
+      # With neither otlp_logs_endpoint nor otlp_endpoint the subsystem must
+      # be a no-op: no exporter POSTing at a dead default address, no backend
+      # capturing events nobody consumes. Stdout logging is unaffected (the
+      # default console handler is never touched).
+      original_logs = Application.get_env(:observlib, :otlp_logs_endpoint)
+      original = Application.get_env(:observlib, :otlp_endpoint)
+      Application.delete_env(:observlib, :otlp_logs_endpoint)
+      Application.delete_env(:observlib, :otlp_endpoint)
 
-      # Should have OtlpLogsExporter and Logs.Backend
-      child_ids = Enum.map(children, fn {id, _pid, _type, _modules} -> id end)
+      on_exit(fn ->
+        if original_logs,
+          do: Application.put_env(:observlib, :otlp_logs_endpoint, original_logs),
+          else: Application.delete_env(:observlib, :otlp_logs_endpoint)
+
+        if original,
+          do: Application.put_env(:observlib, :otlp_endpoint, original),
+          else: Application.delete_env(:observlib, :otlp_endpoint)
+      end)
+
+      assert ObservLib.Logs.Supervisor.children() == []
+    end
+
+    test "children/0 returns exporter + backend when otlp_endpoint is set" do
+      original = Application.get_env(:observlib, :otlp_endpoint)
+      Application.put_env(:observlib, :otlp_endpoint, "http://localhost:4318")
+
+      on_exit(fn ->
+        if original,
+          do: Application.put_env(:observlib, :otlp_endpoint, original),
+          else: Application.delete_env(:observlib, :otlp_endpoint)
+      end)
+
+      child_ids =
+        ObservLib.Logs.Supervisor.children()
+        |> Enum.map(fn {mod, _opts} -> mod end)
 
       assert ObservLib.Exporters.OtlpLogsExporter in child_ids
       assert ObservLib.Logs.Backend in child_ids
     end
 
-    test "children are running" do
-      children = Supervisor.which_children(ObservLib.Logs.Supervisor)
+    test "children/0 honors the logs-specific endpoint override" do
+      original = Application.get_env(:observlib, :otlp_logs_endpoint)
+      Application.put_env(:observlib, :otlp_logs_endpoint, "http://localhost:4318")
 
-      for {_id, pid, _type, _modules} <- children do
-        assert is_pid(pid)
-        assert Process.alive?(pid)
-      end
+      on_exit(fn ->
+        if original,
+          do: Application.put_env(:observlib, :otlp_logs_endpoint, original),
+          else: Application.delete_env(:observlib, :otlp_logs_endpoint)
+      end)
+
+      refute ObservLib.Logs.Supervisor.children() == []
     end
   end
 
